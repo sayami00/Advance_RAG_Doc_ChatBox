@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Documents</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .upload-container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 600px;
+            padding: 30px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 16px;
+        }
+
+        .upload-tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 4px;
+            margin-bottom: 20px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 10px 20px;
+            border: none;
+            background: transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            color: #666;
+            transition: all 0.2s ease;
+        }
+
+        .tab-btn.active {
+            background: white;
+            color: #007bff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .upload-area {
+            border: 2px dashed #d0d0d0;
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            background: #fafafa;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .upload-area:hover {
+            border-color: #007bff;
+            background: #f0f8ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #28a745;
+            background: #f0fff4;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            opacity: 0.7;
+        }
+
+        .upload-text {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .upload-hint {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .file-input-hidden {
+            display: none;
+        }
+
+        .selected-files {
+            margin: 20px 0;
+        }
+
+        .selected-files h3 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .file-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid #007bff;
+            transition: all 0.2s ease;
+        }
+
+        .file-item:hover {
+            background: #e9ecef;
+        }
+
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+        }
+
+        .file-icon {
+            font-size: 24px;
+            width: 40px;
+            height: 40px;
+            background: #007bff;
+            color: white;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .file-details {
+            flex: 1;
+        }
+
+        .file-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 4px;
+            font-size: 14px;
+        }
+
+        .file-size {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .remove-file {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .remove-file:hover {
+            background: #c82333;
+            transform: translateY(-1px);
+        }
+
+        .upload-progress {
+            display: none;
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .progress-bar-container {
+            background: #e9ecef;
+            border-radius: 10px;
+            height: 10px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #28a745, #20c997);
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .progress-text {
+            text-align: center;
+            font-size: 14px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            min-width: 120px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+        }
+
+        .btn-primary:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 30px;
+            color: #666;
+            font-style: italic;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px dashed #dee2e6;
+        }
+
+        .url-input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .url-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s ease;
+        }
+
+        .url-input:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
+        .add-url-btn {
+            padding: 12px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .add-url-btn:hover {
+            background: #0056b3;
+        }
+
+        .url-list {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .url-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .url-item:last-child {
+            border-bottom: none;
+        }
+
+        .url-text {
+            font-size: 14px;
+            color: #007bff;
+            text-decoration: none;
+        }
+
+        .url-text:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="upload-container">
+        <div class="header">
+            <h1>📁 Upload Documents</h1>
+            <p>Upload files or provide URLs to add documents to your chat</p>
+        </div>
+
+        <div class="upload-tabs">
+            <button class="tab-btn active" onclick="switchTab('files')">📄 Upload Files</button>
+            <button class="tab-btn" onclick="switchTab('urls')">🌐 Web Content</button>
+        </div>
+
+        <!-- Files Tab -->
+        <div class="tab-content active" id="filesTab">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📄</div>
+                <div class="upload-text">Click to upload files or drag and drop</div>
+                <div class="upload-hint">Supported formats: PDF, DOCX, TXT</div>
+                <input type="file" class="file-input-hidden" id="fileInput" 
+                       accept=".pdf,.doc,.docx,.txt,.csv,.xlsx,.xls,.pptx,.ppt,.json,.xml,.html,.md"
+                       multiple>
+            </div>
+
+            <div class="selected-files">
+                <h3>Selected Files:</h3>
+                <div class="file-list" id="fileList">
+                    <div class="empty-state">No files selected</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- URLs Tab -->
+        <div class="tab-content" id="urlsTab">
+            <div class="url-input-group">
+                <input type="url" class="url-input" id="urlInput" placeholder="Enter URL (e.g., https://example.com)">
+                <button class="add-url-btn" onclick="addUrl()">Add URL</button>
+            </div>
+            
+            <div class="selected-files">
+                <h3>Added URLs:</h3>
+                <div class="url-list" id="urlList">
+                    <div class="empty-state">No URLs added</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="upload-progress" id="uploadProgress">
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <div class="progress-text" id="progressText">Uploading...</div>
+        </div>
+
+        <div class="actions">
+            <button class="btn btn-secondary" onclick="window.close()">Cancel</button>
+            <button class="btn btn-primary" id="processBtn" onclick="processFiles()" disabled>Process Files</button>
+        </div>
+    </div>
+
+    <script>
+        let selectedFiles = [];
+        let selectedUrls = [];
+        let isUploading = false;
+        let currentTab = 'files';
+
+ 
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeUpload();
+        });
+
+        function initializeUpload() {
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+
+            // Click to upload
+            uploadArea.addEventListener('click', () => {
+                if (!isUploading) fileInput.click();
+            });
+
+            // File input change
+            fileInput.addEventListener('change', (e) => {
+                handleFileSelection(Array.from(e.target.files));
+            });
+
+            // Drag and drop
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('dragover');
+            });
+
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                if (!isUploading) {
+                    handleFileSelection(Array.from(e.dataTransfer.files));
+                }
+            });
+
+            // URL input enter key
+            document.getElementById('urlInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    addUrl();
+                }
+            });
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            
+            // Update tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(tab + 'Tab').classList.add('active');
+            
+            updateProcessButton();
+        }
+
+        function handleFileSelection(files) {
+            files.forEach(file => {
+                const isDuplicate = selectedFiles.some(existing => 
+                    existing.name === file.name && existing.size === file.size
+                );
+                if (!isDuplicate) {
+                    selectedFiles.push(file);
+                }
+            });
+            
+            updateFileList();
+            updateProcessButton();
+        }
+
+        function addUrl() {
+            const urlInput = document.getElementById('urlInput');
+            const url = urlInput.value.trim();
+            
+            if (!url) return;
+            
+            // Basic URL validation
+            try {
+                new URL(url);
+            } catch (e) {
+                alert('Please enter a valid URL');
+                return;
+            }
+            
+            // Check for duplicates
+            if (selectedUrls.includes(url)) {
+                alert('URL already added');
+                return;
+            }
+            
+            selectedUrls.push(url);
+            urlInput.value = '';
+            updateUrlList();
+            updateProcessButton();
+        }
+
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            updateFileList();
+            updateProcessButton();
+        }
+
+        function removeUrl(index) {
+            selectedUrls.splice(index, 1);
+            updateUrlList();
+            updateProcessButton();
+        }
+
+        function updateFileList() {
+            const fileList = document.getElementById('fileList');
+            
+            if (selectedFiles.length === 0) {
+                fileList.innerHTML = '<div class="empty-state">No files selected</div>';
+                return;
+            }
+
+            fileList.innerHTML = selectedFiles.map((file, index) => `
+                <div class="file-item">
+                    <div class="file-info">
+                        <div class="file-icon">📄</div>
+                        <div class="file-details">
+                            <div class="file-name">${file.name}</div>
+                            <div class="file-size">${formatFileSize(file.size)}</div>
+                        </div>
+                    </div>
+                    <button class="remove-file" onclick="removeFile(${index})">Remove</button>
+                </div>
+            `).join('');
+        }
+
+        function updateUrlList() {
+            const urlList = document.getElementById('urlList');
+            
+            if (selectedUrls.length === 0) {
+                urlList.innerHTML = '<div class="empty-state">No URLs added</div>';
+                return;
+            }
+
+            urlList.innerHTML = selectedUrls.map((url, index) => `
+                <div class="url-item">
+                    <a href="${url}" target="_blank" class="url-text">${url}</a>
+                    <button class="remove-file" onclick="removeUrl(${index})">Remove</button>
+                </div>
+            `).join('');
+        }
+
+        function updateProcessButton() {
+            const processBtn = document.getElementById('processBtn');
+            const hasContent = (currentTab === 'files' && selectedFiles.length > 0) || 
+                              (currentTab === 'urls' && selectedUrls.length > 0);
+            processBtn.disabled = !hasContent || isUploading;
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function showProgress() {
+            document.getElementById('uploadProgress').style.display = 'block';
+        }
+
+        function updateProgress(percent, text) {
+            document.getElementById('progressBar').style.width = percent + '%';
+            document.getElementById('progressText').textContent = text;
+        }
+
+        async function processFiles() {
+            if (isUploading) return;
+            const params = new URLSearchParams(window.location.search);
+            const currentUser = params.get("user");
+            console.log("Current user in popup windown:", currentUser);
+            const hasFiles = selectedFiles.length > 0;
+            const hasUrls = selectedUrls.length > 0;
+
+            if (!hasFiles && !hasUrls) return;
+
+            isUploading = true;
+            updateProcessButton();
+            showProgress();
+
+            try {
+                const formData = new FormData();
+                
+                // Add files
+                selectedFiles.forEach(file => {
+                    formData.append('files', file);
+                });
+                
+                // Add URLs
+                selectedUrls.forEach(url => {
+                    formData.append('urls', url);
+                });
+                
+                // Add metadata (get from parent window if available)
+                const parentData = getParentWindowData();
+                //formData.append('user_id', parentData.user_id || 'demo');
+                //formData.append('chat_id', parentData.chat_id || 'default');
+                formData.append('current_user', currentUser || 'demo');
+
+                updateProgress(20, 'Preparing upload...');
+
+                // Make API call to your upload endpoint
+                const response = await fetch('http://127.0.0.1:3000/uploadprocess', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'Authorization': `Bearer ${parentData.token}`
+                    }
+                });
+                updateProgress(60, 'Processing files...');
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                updateProgress(100, 'Upload complete!');
+
+                // Send success message to parent window
+                if (window.opener) {
+                    window.opener.postMessage({
+                        type: 'upload_success',
+                        files: selectedFiles.map(f => f.name),
+                        urls: selectedUrls,
+                        result: result
+                    }, '*');
+                }
+
+                // Close window after brief delay
+                setTimeout(() => {
+                    window.close();
+                }, 1500);
+
+            } catch (error) {
+                console.error('Upload error:', error);
+                updateProgress(0, 'Upload failed. Please try again.');
+                
+                // Send error message to parent window
+                if (window.opener) {
+                    window.opener.postMessage({
+                        type: 'upload_error',
+                        error: error.message
+                    }, '*');
+                }
+                
+                isUploading = false;
+                updateProcessButton();
+                
+                setTimeout(() => {
+                    document.getElementById('uploadProgress').style.display = 'none';
+                }, 2000);
+            }
+        }
+
+        function getParentWindowData() {
+            // Try to get data from parent window
+            console.log(window.opener.currentUser)
+            if (window.opener && window.opener.currentUser) {
+                return {
+                    user_id: window.opener.currentUser.user_email,
+                    chat_id: window.opener.currentChatId || window.opener.generateChatSessionId(),
+                    token: window.opener.currentUser.session_token
+                };
+            }
+            return { user_id: 'demo', chat_id: 'default', token: 'demo-token' };
+        }
+
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,2552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> Chatbox</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #6a03cb 0%, #764ba2 100%);
+            min-height: 100vh;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        bodyaaa {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+
+
+        /* Login Form Styles */
+        .container {
+            background: rgb(235, 233, 233);            
+            border-radius: 20px;
+            padding: 30px;
+            position: absolute;        /* take it out of normal flow */
+            top: 50%;                  /* push down 50% */
+            left: 50%;                 /* push right 50% */
+            transform: translate(-50%, -50%); /* pull back half of its own size */
+            font-weight: 200;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .containerbak {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .login-form {
+            display: block;
+            width: 100%;
+        }
+
+        .login-formbak {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 400px;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .login-logo {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(45deg, #ff6b35, #f7931e);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 24px;
+            margin: 0 auto 16px;
+        }
+
+        .logo-img {
+        width: 100px;  /* adjust size as needed */
+        height: auto;
+        }
+
+        .login-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .login-subtitle {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+
+        .otp-step {
+            display: none;
+        }
+
+        .otp-step.active {
+            display: block;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .otp-input-container {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        .otp-input {
+            width: 50px;
+            height: 50px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .otp-input:focus {
+            border-color: #1976d2;
+            box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+        }
+
+        .otp-input.filled {
+            border-color: #4caf50;
+            background: #f1f8e9;
+        }
+
+        .resend-otp {
+            text-align: center;
+            margin: 16px 0;
+            font-size: 14px;
+        }
+
+        .resend-link {
+            color: #1976d2;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        .resend-link:hover {
+            color: #1565c0;
+        }
+
+        .resend-link.disabled {
+            color: #999;
+            cursor: not-allowed;
+            text-decoration: none;
+        }
+
+        .timer {
+            color: #f57c00;
+            font-weight: bold;
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            color: #1976d2;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 4px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .back-btn:hover {
+            text-decoration: underline;
+        }
+
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .step-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            transition: background-color 0.2s;
+        }
+
+        .step-dot.active {
+            background: #1976d2;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            outline: none;
+        }
+
+        .form-input:focus {
+            border-color: #1976d2;
+            box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+        }
+
+        .form-input.error {
+            border-color: #d32f2f;
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+        }        
+
+        .login-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(45deg, #7f19d2, #7f19d2);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-bottom: 16px;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 5px 15px rgba(25, 118, 210, 0.3);
+        }
+
+        .login-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-bottom: 10px;
+        }
+
+        .btn-success {
+            background: #4caf50;
+            color: white;
+        }    
+
+        .btn-success:hover {
+            background: #388e3c;
+        }    
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .remember-me {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .remember-me {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .login-footer {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .login-link {
+            color: #1976d2;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .login-link:hover {
+            text-decoration: underline;
+        }
+
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            border-left: 4px solid #c62828;
+        }
+
+        /* .demo-credentials {
+            background: #e3f2fd;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 12px;
+            color: #1976d2;
+            border-left: 4px solid #1976d2;
+        } */
+
+        /* Hide chat app initially */
+        .app-container {
+            display: none;
+            height: 100vh;
+        }
+        /* Chat App Styles - Fixed body layout for chat */
+        body.chat-mode {
+            padding: 0;
+            align-items: stretch;
+            justify-content: stretch;
+        }
+        /* Chat App Styles (from original code) */
+        .sidebar {
+            width: 280px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border-radius:  0 20px 20px 0;
+            margin: 5px 5px 5px 5px;
+
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .logo {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(45deg, #ff6b35, #f7931e);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 16px;
+            box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+        }
+
+        .app-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #333;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        .register-form {
+            display: none;
+        }
+
+        .chat-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .chat-item {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #666;
+        }
+
+        .chat-item:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateX(4px);
+        }
+
+        .chat-item.active {
+            background: linear-gradient(45deg, rgba(25, 118, 210, 0.2), rgba(21, 101, 192, 0.2));
+            color: #1976d2;
+            border-left: 3px solid #1976d2;
+            font-weight: 500;
+        }
+
+        .chat-item.starred::after {
+            content: "⭐";
+            margin-left: auto;
+            font-size: 12px;
+        }
+
+        .chat-icon {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #ddd;
+        }
+
+        .new-chat-btn {
+            margin: 20px;
+            padding: 14px 20px;
+            background: linear-gradient(45deg, #7f19d2, #7f19d2);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(25, 118, 210, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .new-chat-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(25, 118, 210, 0.4);
+        }
+
+        .sidebar-footer {
+            padding: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .sidebar-footer-item {
+            padding: 8px 16px;
+            color: #666;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: background-color 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sidebar-footer-item:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateX(4px);
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            margin-bottom: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #1976d2, #1565c0);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .user-details {
+            flex: 1;
+        }
+
+        .user-name {
+            font-weight: 500;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .user-status {
+            color: #666;
+            font-size: 12px;
+        }
+
+        /* Main Chat Area */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border-radius: 20px 0 0 20px;
+            margin: 5px 5px 5px 1px;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            padding: 20px 30px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+        }
+
+        .chat-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .header-btn {
+            padding: 8px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            border-radius: 4px;
+            color: #666;
+            transition: background-color 0.2s;
+        }
+
+        .header-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: scale(1.1);
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        .message {
+            display: inline-block;
+            max-width: 100%;
+            padding: 12px 16px;
+            border-radius: 16px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+
+        .message.user {
+            align-self: flex-end;
+            margin-left: auto;
+            background: linear-gradient(135deg, #1976d2, #1565c0);
+            color: white;
+            border-bottom-right-radius: 4px;
+            box-shadow: 0 4px 15px rgba(25, 118, 210, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .message.assistant {
+            align-self: flex-start;
+            margin-right: auto;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .message.system {
+            align-self: center;
+            background: linear-gradient(45deg, rgba(255, 193, 7, 0.15), rgba(255, 152, 0, 0.15));
+            color: #f57c00;
+            font-size: 14px;
+            text-align: center;
+            max-width: 50%;
+            border: 1px solid rgba(255, 193, 7, 0.2);
+        }
+
+        /* Document attachments */
+        .message-attachment {
+            margin-top: 8px;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .message.user .message-attachment {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .attachment-icon {
+            width: 16px;
+            height: 16px;
+            background: #4caf50;
+            border-radius: 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 10px;
+        }
+
+        .typing-indicator {
+            display: none;
+            align-self: flex-start;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 16px;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 4px;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #999;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes typing {
+            0%, 80%, 100% { opacity: 0.3; }
+            40% { opacity: 1; }
+        }
+
+        /* Input Area */
+        .input-area {
+            padding: 30px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+        }
+
+        .input-container {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .upload-btn {
+            width: 50px;
+            height: 50px;
+            border: none;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: #666;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+
+        .upload-btn:hover {
+            background: #1976d2;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(25, 118, 210, 0.4);
+        }
+
+        .file-input {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .input-wrapper {
+            flex: 1;
+            position: relative;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 25px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .input-wrapper:focus-within {
+            border-color: #1976d2;
+            box-shadow: 0 4px 20px rgba(25, 118, 210, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .message-input {
+            width: 100%;
+            border: none;
+            background: transparent;
+            padding: 15px 60px 15px 20px;
+            border-radius: 25px;
+            outline: none;
+            font-size: 15px;
+            line-height: 1.4;
+            resize: none;
+            max-height: 120px;
+            min-height: 50px;
+        }
+
+        .message-input::placeholder {
+            color: #999;
+        }
+
+        .input-actions {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            gap: 4px;
+        }
+
+        .input-btn {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            transition: all 0.2s;
+        }
+
+        .input-btn:hover {
+            background: rgba(255, 255, 255, 0.8);
+            transform: scale(1.1);
+        }
+
+        .input-btn.recording {
+            background: #ff4444;
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        .send-btn {
+            width: 50px;
+            height: 50px;
+            border: none;
+            background: linear-gradient(135deg, #7f19d2, #7f19d2);
+            color: white;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(25, 118, 210, 0.3);
+            font-size: 16px;
+        }
+
+        .send-btn:hover {
+            background: linear-gradient(135deg, #1565c0, #0d47a1);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(25, 118, 210, 0.4);
+        }
+
+        .send-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .model-selector {
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 12px;
+            padding: 10px 16px;
+            font-size: 14px;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .model-selector:hover {
+            border-color: #1976d2;
+            transform: translateY(-1px);
+        }
+
+        .welcome-message {
+            text-align: center;
+            padding: 60px 24px;
+            color: #666;
+        }
+
+        .welcome-message h2 {
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .chat-error-message {
+            background: linear-gradient(45deg, rgba(211, 47, 47, 0.1), rgba(198, 40, 40, 0.1));
+            color: #c62828;
+            padding: 15px 20px;
+            border-radius: 12px;
+            margin: 12px 30px;
+            border-left: 4px solid #c62828;
+            box-shadow: 0 4px 15px rgba(211, 47, 47, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        /* File upload indicator */
+        .upload-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #4caf50;
+            color: white;
+            padding: 10px 16px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+            z-index: 1000;
+            transform: translateX(300px);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .upload-indicator.show {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        /* Drag and drop overlay */
+        .drag-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(25, 118, 210, 0.1);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+        }
+
+        .drag-overlay.active {
+            display: flex;
+        }
+
+        .drag-message {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 20px;
+            border: 3px dashed #1976d2;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .drag-icon {
+            font-size: 48px;
+            color: #1976d2;
+            margin-bottom: 16px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 250px;
+            }
+            
+            .message {
+                max-width: 85%;
+            }
+
+            .login-form {
+                margin: 20px;
+                padding: 30px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Form -->
+    <div class="container">
+        <div id="loginContainer" class="login-form">
+            <div class="login-header">
+                <div class="login-logo">🤖</div>
+                <div class="login-title">Welcome to  Chatbox</div>
+                <div class="login-subtitle">Enter your email to receive OTP</div>
+            </div>
+
+            <div class="step-indicator">
+                <div class="step-dot active" id="step1Dot"></div>
+                <div class="step-dot" id="step2Dot"></div>
+            </div>
+
+            <!-- <div class="demo-credentials">
+                <strong>Demo Email:</strong><br>
+                demo@example.com
+            </div> -->
+
+            <div class="error-message" id="loginError" style="display: none;">
+                Invalid email or OTP. Please try again.
+            </div>
+
+            <!-- Step 1: Email Input -->
+            <div class="email-step" id="emailStep">
+                <form id="emailForm">
+                    <div class="form-group">
+                        <label class="form-label" for="email">Email Address</label>
+                        <input 
+                            type="email" 
+                            id="email" 
+                            class="form-input" 
+                            placeholder="Enter your email address"
+                            required
+                        >
+                    </div>
+
+                    <div class="remember-me">
+                        <input type="checkbox" id="rememberMe">
+                        <label for="rememberMe">Remember me</label>
+                    </div>
+
+                    <button type="submit" class="login-btn" id="emailBtn">
+                        Send OTP
+                    </button>
+                </form>
+            </div>
+
+            <!-- Step 2: OTP Input -->
+            <div class="otp-step" id="otpStep">
+                <button class="back-btn" type="button" id="backBtn">
+                    ← Back to Email
+                </button>
+
+                <form id="otpForm">
+                    <div class="form-group">
+                        <label class="form-label">Enter 6-digit OTP</label>
+                        <div class="otp-input-container">
+                            <input type="text" class="otp-input" maxlength="1" id="otp1">
+                            <input type="text" class="otp-input" maxlength="1" id="otp2">
+                            <input type="text" class="otp-input" maxlength="1" id="otp3">
+                            <input type="text" class="otp-input" maxlength="1" id="otp4">
+                            <input type="text" class="otp-input" maxlength="1" id="otp5">
+                            <input type="text" class="otp-input" maxlength="1" id="otp6">
+                        </div>
+                        <div class="resend-otp">
+                            <span>Didn't receive OTP? </span>
+                            <span class="resend-link" id="resendLink">Resend OTP</span>
+                            <span class="timer" id="timer" style="display: none;"></span>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="login-btn" id="otpBtn">
+                        Verify & Sign In
+                    </button>
+                </form>
+            </div>
+
+            <!-- <div class="login-footer">
+                <a href="#" class="login-link">Forgot your password?</a>
+            </div> -->
+        </div>
+
+        <!-- Registration Screen -->
+        <div id="registerScreen" class="register-form">
+            <div class="login-logo">🤖</div>
+            <h1>Create Account</h1>
+            <p class="login-subtitle">Register to get started</p>
+            
+            <div class="error-message" id="registerError" style="display: none;"></div>
+            
+            <div class="form-group">
+                <label for="registerEmail">Email Address</label>
+                <input type="email" id="registerEmail" class="form-input" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="department">Department</label>
+                <select id="department" class="form-select" required>
+                    <option value="">Select Department</option>
+                    <option value="IT-BSS">IT-BSS</option>
+                    <option value="IT-CSS">IT-CSS</option>
+                    <option value="IT-OSS">IT-OSS</option>
+                    <option value="IT">IT</option>
+                    <option value="HR">Human Resources</option>
+                    <option value="Finance">Finance</option>
+                    <option value="Marketing">Marketing</option>
+                    <option value="Sales">Sales</option>
+                    <option value="Technology">Operations</option>
+                </select>            
+            </div>
+            
+            <button class="btn btn-success" id="registerBtn">Register</button>
+            <button class="btn btn-secondary" id="showLoginBtn">Back to Login</button>
+        </div>
+    </div>
+
+    <!-- Drag and Drop Overlay -->
+    <div class="drag-overlay" id="dragOverlay">
+        <div class="drag-message">
+            <div class="drag-icon">📁</div>
+            <h3>Drop your documents here</h3>
+            <p>Supports PDF, DOC, DOCX, TXT, and more</p>
+        </div>
+    </div>
+
+    <!-- Upload Indicator -->
+    <div class="upload-indicator" id="uploadIndicator">
+        <span id="uploadStatus">📤 Uploading...</span>
+    </div>
+
+    <!-- Chat App -->
+    <div class="app-container" id="appContainer">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <!-- <div class="logo">🤖</div> -->
+
+                <div class="app-title"> Chatbox</div>
+            </div>
+
+            <!-- New Chat button moved here -->
+            <button class="new-chat-btn" id="newChatBtn">
+                ➕ New Chat
+            </button>
+
+            <div class="chat-list" id="chatList">
+                <!-- Chat history will be loaded here -->
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="user-info" id="userInfo">
+                    <div class="user-avatar" id="userAvatar">U</div>
+                    <div class="user-details">
+                        <div class="user-name" id="userName">User</div>
+                        <!-- <div class="user-status">Online</div> -->
+                    </div>
+                </div>
+                <div class="sidebar-footer-item" id="logoutBtn">
+                    🚪 Sign Out
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Chat Area -->
+        <div class="main-content">
+            <div class="chat-header">
+                <div class="chat-title">Just chat</div>
+                <div class="header-actions"></div>
+            </div>
+
+            <div class="chat-messages" id="chatMessages">
+                <div class="welcome-message">
+                    <h2>Welcome to  Chatbox!</h2>
+                    <p>Start a conversation by typing your message below / upload documents to main your domain database.</p>
+                </div>
+            </div>
+
+            <div class="typing-indicator" id="typingIndicator">
+                <div class="typing-dots">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            </div>  
+
+            <div class="input-area">
+                <div class="input-container">
+                    <!-- Document Upload Button -->
+                    <!-- <button class="upload-btn" id="uploadBtn">
+                        ➕
+                        <input type="file" class="file-input" id="fileInput" 
+                               accept=".pdf,.doc,.docx,.txt,.csv,.xlsx,.xls,.pptx,.ppt,.json,.xml,.html,.md"
+                               multiple>
+                    </button> -->
+                    <button class="upload-btn" id="uploadBtn">
+                        ➕
+                    </button>
+                    <div class="input-wrapper">
+                        <textarea 
+                            class="message-input" 
+                            id="messageInput"
+                            placeholder="Type your question here or upload documents..."
+                            rows="1"
+                        ></textarea>
+                        <div class="input-actions">
+                            <button class="input-btn" id="voiceBtn">🎤</button>
+                        </div>
+                    </div>
+                    <button class="send-btn" id="sendBtn">
+                        ➤
+                    </button>
+                </div>
+                <div style="text-align: center; margin-top: 12px;">
+                    <select class="model-selector" id="modelSelector">
+                        <option value="Mydepartment">My Department ⌄</option>
+                        <option value="ITServicesGlobal">IT Services Global</option>
+                        <option value="GPTs">GPT Model</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentUser = null;
+        let isRecording = false;
+        let otpTimer = null;
+        let currentChatId = null;
+        let uploadedFiles = [];
+        let isLoading = false;
+        let currentChatMessages = [];
+        let currentSessionId = null;
+        let newChatSessionId = null;
+        let chatHistory = [];
+
+        // FastAPI configuration
+        //const API_BASE_URL = 'http://localhost:8000';
+        const FASTAPI_CHAT_URL = 'http://127.0.0.1:3000/chat_langgraph';
+        const FASTAPI_HISTORY_URL = 'http://127.0.0.1:3000/chat-history';
+        const FASTAPI_REQUEST_OTP_URL = 'http://127.0.0.1:3000/request-otp';
+        const FASTAPI_VERIFY_OTP_URL = 'http://127.0.0.1:3000/verify-otp';
+        const FASTAPI_REGISTER_URL = 'http://127.0.0.1:3000/register-user';
+        const FASTAPI_VERIFY_USER_URL = 'http://127.0.0.1:3000/users';
+        const FASTAPI_UPLOAD_PROCESS = 'http://127.0.0.1:3000/uploadprocess';
+
+        // Utility functions
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        function generateUUID8() {
+            return 'xxxxxxxx'.replace(/[x]/g, function() {
+                return (Math.random() * 16 | 0).toString(16);
+            });
+        }
+
+        function generateSessionId(email) {
+            const username = email.split('@')[0];
+            const uuid = generateUUID();
+            return `${username}_${uuid}`;
+        }
+
+        function generateChatSessionId() {
+            if (!currentUser) return null;
+            const username = currentUser.user_email.split('@')[0];
+            const avatarLetter = username.charAt(0).toUpperCase();
+            const uuid8 = generateUUID8();
+            return `${avatarLetter}_chat_${uuid8}`;
+        }
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeEventListeners();
+            checkLoginStatus();
+        });
+
+        function checkLoginStatus() {
+            const savedUser = localStorage.getItem('chatboxUser');
+            const savedSession = localStorage.getItem('chatboxSessionId');
+            const sessionExpiry = localStorage.getItem('sessionExpiry');
+            
+            if (sessionExpiry) {
+                const expiryDate = new Date(sessionExpiry);
+                const now = new Date();
+                if (now > expiryDate) {
+                    clearAllSessionData();
+                    showLoginScreen();
+                    return;
+                }
+            }
+            
+            if (savedUser && savedSession) {
+                try {
+                    currentUser = JSON.parse(savedUser);
+                    currentSessionId = savedSession;
+                    
+                    if (currentUser && currentUser.user_email && currentUser.username) {
+                        const activeChatId = localStorage.getItem('activeChatId');
+                        if (activeChatId) {
+                            currentChatId = activeChatId;
+                        }
+                        showChatApp();
+                        return;
+                    } else {
+                        clearAllSessionData();
+                    }
+                } catch (error) {
+                    console.error('Error parsing saved user data:', error);
+                    clearAllSessionData();
+                }
+            }
+            
+            showLoginScreen();
+        }
+
+        function clearAllSessionData() {
+            localStorage.removeItem('chatboxUser');
+            localStorage.removeItem('chatboxSessionId');
+            localStorage.removeItem('sessionExpiry');
+            clearCurrentChatState();
+        }
+
+        function showLoginScreen() {
+            document.getElementById('appContainer').style.display = 'none';
+            document.getElementById('registerScreen').style.display = 'none';
+            document.getElementById('loginContainer').style.display = 'block';
+            document.querySelector('.container').style.display = 'flex';
+            document.body.classList.remove('chat-mode');
+            goBackToEmail();
+        }
+
+        function showChatApp() {
+            document.getElementById('loginContainer').style.display = 'none';
+            document.getElementById('registerScreen').style.display = 'none';
+            document.getElementById('appContainer').style.display = 'flex';
+            document.body.classList.add('chat-mode');
+            
+            if (currentUser) {
+                const displayName = currentUser.user_email.split('@')[0];
+                const avatarLetter = displayName.charAt(0).toUpperCase();
+                
+                document.getElementById('userName').textContent = displayName;
+                document.getElementById('userAvatar').textContent = avatarLetter;
+            }
+
+            if (currentChatId) {
+                loadChatHistory().then(() => {
+                    const savedActiveChat = localStorage.getItem('activeChat');
+                    if (savedActiveChat) {
+                        try {
+                            const activeChatData = JSON.parse(savedActiveChat);
+                            loadChatFromData(activeChatData);
+                        } catch (error) {
+                            startNewChat();
+                        }
+                    }
+                });
+            } else {
+                startNewChat();
+                setTimeout(() => loadChatHistory(), 500);
+            }
+        }
+
+        function startNewChat() {
+            newChatSessionId = generateChatSessionId();
+            currentChatId = null;
+            currentChatMessages = [];
+            clearCurrentChatState();
+            
+            const messagesContainer = document.getElementById('chatMessages');
+            messagesContainer.innerHTML = `
+                <div class="welcome-message">
+                    <h2>Welcome to  Chatbox!</h2>
+                    <p>Start a conversation by typing your message below or upload documents to chat about.</p>
+                </div>
+            `;
+            
+            document.querySelector('.chat-title').textContent = 'New Chat';
+            document.querySelectorAll('.chat-item').forEach(item => item.classList.remove('active'));
+            
+            reloadChatHistoryAndAddNewChat();
+        }
+
+        async function reloadChatHistoryAndAddNewChat() {
+            try {
+                await loadChatHistory();
+                setTimeout(() => addTemporaryNewChatItem(), 100);
+            } catch (error) {
+                console.error('Error reloading chat history:', error);
+                addTemporaryNewChatItem();
+            }
+        }
+
+        function addTemporaryNewChatItem() {
+            const chatList = document.getElementById('chatList');
+            const existingTempChat = chatList.querySelector('.chat-item.temp-new-chat');
+            if (existingTempChat) {
+                existingTempChat.remove();
+            }
+            
+            const tempChatItem = document.createElement('div');
+            tempChatItem.className = 'chat-item temp-new-chat active';
+            tempChatItem.innerHTML = `
+                <div class="chat-icon"></div>
+                <div class="chat-content">
+                    <div class="chat-title">New Chat</div>
+                    <div class="chat-date">Just now</div>
+                </div>
+            `;
+            
+            chatList.insertBefore(tempChatItem, chatList.firstChild);
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            const ragtype = document.getElementById('modelSelector');
+            
+            if (!message || isLoading) return;
+
+            let currentChatSessionId;
+            if (newChatSessionId) {
+                currentChatSessionId = newChatSessionId;
+            } else if (currentChatId) {
+                currentChatSessionId = currentChatId;
+            } else {
+                currentChatSessionId = generateChatSessionId();
+                newChatSessionId = currentChatSessionId;
+            }
+
+            addMessageToDOM(message, 'user');
+            currentChatMessages.push({ 
+                content: message, 
+                role: 'user',
+                timestamp: new Date().toISOString()
+            });
+            
+            input.value = '';
+            input.style.height = 'auto';
+            showTypingIndicator();
+            
+            try {
+                isLoading = true;
+                updateSendButton();
+
+                const response = await fetch(FASTAPI_CHAT_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${currentUser?.session_token}`
+                    },
+                    body: JSON.stringify({
+                        query: message,
+                        chat_id: currentChatSessionId,
+                        user_id: currentUser?.username,
+                        session_id: currentUser?.sessionId,
+                        email: currentUser?.user_email,
+                        ragtype: ragtype.value
+                    })
+                });
+
+                hideTypingIndicator();
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                const aiResponse = data.response || data.answer || data.message || 'No response received';
+                
+                addMessageToDOM(aiResponse, 'assistant');
+                currentChatMessages.push({ 
+                    content: aiResponse, 
+                    role: 'assistant',
+                    timestamp: new Date().toISOString()
+                });
+
+                if (newChatSessionId && currentChatMessages.length >= 2) {
+                    await saveNewChatToHistory(newChatSessionId, message, aiResponse);
+                    currentChatId = newChatSessionId;
+                    newChatSessionId = null;
+                }
+
+            } catch (error) {
+                hideTypingIndicator();
+                console.error('Error sending message:', error);
+                addMessageToDOM('Sorry, I encountered an error while processing your request. Please try again.', 'assistant');
+            } finally {
+                isLoading = false;
+                updateSendButton();
+            }
+        }
+
+        async function saveNewChatToHistory(chatId, firstMessage, firstResponse) {
+            const newChat = {
+                id: chatId,
+                title: generateChatTitle(firstMessage),
+                messages: currentChatMessages,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                user_id: currentUser?.username
+            };
+
+            try {
+                let localHistory = [];
+                try {
+                    const localData = localStorage.getItem('chatHistory');
+                    if (localData) {
+                        const parsed = JSON.parse(localData);
+                        localHistory = Array.isArray(parsed) ? parsed : [];
+                    }
+                } catch (parseError) {
+                    localHistory = [];
+                }
+
+                localHistory.unshift(newChat);
+                
+                if (localHistory.length > 50) {
+                    localHistory = localHistory.slice(0, 50);
+                }
+                
+                localStorage.setItem('chatHistory', JSON.stringify(localHistory));
+                
+                const chatList = document.getElementById('chatList');
+                chatList.innerHTML = '';
+                displayChatHistory(localHistory);
+                
+                setTimeout(() => {
+                    const newChatItem = Array.from(document.querySelectorAll('.chat-item')).find(item => 
+                        item.dataset.chatId === chatId
+                    );
+                    
+                    if (newChatItem) {
+                        document.querySelectorAll('.chat-item').forEach(item => item.classList.remove('active'));
+                        newChatItem.classList.add('active');
+                    }
+                }, 100);
+                
+            } catch (error) {
+                console.error('Error saving new chat to history:', error);
+            }
+        }
+
+        function generateChatTitle(firstMessage) {
+            let title = firstMessage.substring(0, 30);
+            if (firstMessage.length > 30) {
+                title += '...';
+            }
+            return title;
+        }
+
+        async function loadChatHistory() {
+            try {
+                const username = currentUser?.username;
+                if (username) {
+                    const url = `${FASTAPI_HISTORY_URL}/${username}`;
+                    const response = await fetch(url, {
+                        headers: {
+                            'Authorization': `Bearer ${currentSessionId}`,
+                            'Content-Type': 'application/json'
+                        },
+                        method: 'GET'
+                    });
+
+                    if (response.ok) {
+                        const serverHistory = await response.json();
+                        
+                        let localHistory = [];
+                        try {
+                            const localData = localStorage.getItem('chatHistory');
+                            if (localData) {
+                                const parsed = JSON.parse(localData);
+                                localHistory = Array.isArray(parsed) ? parsed : [];
+                            }
+                        } catch (parseError) {
+                            localHistory = [];
+                        }
+                        
+                        const mergedHistory = mergeChatHistories(serverHistory, localHistory);
+                        localStorage.setItem('chatHistory', JSON.stringify(mergedHistory));
+                        displayChatHistory(mergedHistory);
+                        return;
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading server chat history:', error);
+            }
+            
+            let localHistory = [];
+            try {
+                const localData = localStorage.getItem('chatHistory');
+                if (localData) {
+                    const parsed = JSON.parse(localData);
+                    localHistory = Array.isArray(parsed) ? parsed : [];
+                }
+            } catch (parseError) {
+                localHistory = [];
+                localStorage.removeItem('chatHistory');
+            }
+            
+            displayChatHistory(localHistory);
+        }
+
+        function mergeChatHistories(serverHistory, localHistory) {
+            const historyMap = new Map();
+            
+            const safeServerHistory = Array.isArray(serverHistory) ? serverHistory : [];
+            const safeLocalHistory = Array.isArray(localHistory) ? localHistory : [];
+            
+            safeServerHistory.forEach(chat => {
+                if (chat && chat.id) {
+                    historyMap.set(chat.id, chat);
+                }
+            });
+            
+            safeLocalHistory.forEach(chat => {
+                if (chat && chat.id) {
+                    historyMap.set(chat.id, chat);
+                }
+            });
+            
+            const mergedArray = Array.from(historyMap.values());
+            return mergedArray.sort((a, b) => {
+                const dateA = a.updated_at ? new Date(a.updated_at) : new Date(0);
+                const dateB = b.updated_at ? new Date(b.updated_at) : new Date(0);
+                return dateB - dateA;
+            });
+        }
+
+        function displayChatHistory(history) {
+            const chatList = document.getElementById('chatList');
+            
+            if (!chatList) {
+                console.error('chatList element not found');
+                return;
+            }
+
+            chatList.innerHTML = '';
+
+            if (history && history.length > 0) {
+                const sortedHistory = history.sort((a, b) => 
+                    new Date(b.updated_at) - new Date(a.updated_at)
+                );
+
+                sortedHistory.forEach((chat, index) => {
+                    const chatItem = document.createElement('div');
+                    chatItem.className = 'chat-item';
+                    
+                    const updatedDate = chat.updated_at ? 
+                        new Date(chat.updated_at).toLocaleDateString() : '';
+                    
+                    chatItem.innerHTML = `
+                        <div class="chat-icon"></div>
+                        <div class="chat-content">
+                            <div class="chat-title">${chat.title || `Chat ${chat.id.substring(0, 8)}`}</div>
+                            <div class="chat-date">${updatedDate}</div>
+                        </div>
+                    `;
+                    
+                    chatItem.dataset.chatId = chat.id;
+                    chatItem.dataset.chatTitle = chat.title || `Chat ${chat.id.substring(0, 8)}`;
+                    
+                    chatItem.onclick = () => loadChat(chat.id, chatItem);
+                    chatList.appendChild(chatItem);
+                });
+            } else {
+                chatList.innerHTML = `
+                    <div class="empty-chat-history">
+                        <div class="empty-icon">💬</div>
+                        <div class="empty-message">No chat history found</div>
+                        <div class="empty-subtitle">Start a new conversation to see it here</div>
+                    </div>
+                `;
+            }
+        }
+
+        async function loadChat(chatId, chatItemElement = null) {
+            try {
+                const localHistory = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+                const localChat = localHistory.find(chat => chat.id === chatId);
+                
+                if (localChat && localChat.messages) {
+                    loadChatFromData(localChat, chatItemElement);
+                    return;
+                }
+
+                const url = `${FASTAPI_HISTORY_URL}/history/${chatId}`;
+                const response = await fetch(url, {
+                    headers: {
+                        'Authorization': `Bearer ${currentSessionId}`,
+                        'Content-Type': 'application/json'
+                    },
+                    method: 'GET'
+                });
+
+                if (response.ok) {
+                    const chatData = await response.json();
+                    
+                    const chatObject = {
+                        id: chatId,
+                        messages: chatData,
+                        title: `Chat ${chatId.substring(0, 8)}`,
+                        updated_at: new Date().toISOString()
+                    };
+                    
+                    loadChatFromData(chatObject, chatItemElement);
+                }
+            } catch (error) {
+                console.error('Error loading chat:', error);
+            }
+        }
+
+        function loadChatFromData(chatData, chatItemElement) {
+            const tempChatItem = document.querySelector('.chat-item.temp-new-chat');
+            if (tempChatItem) {
+                tempChatItem.remove();
+            }
+
+            document.querySelectorAll('.chat-item').forEach(item => item.classList.remove('active'));
+            if (chatItemElement) chatItemElement.classList.add('active');
+            
+            currentChatId = chatData.id;
+            currentChatMessages = chatData.messages || [];
+            newChatSessionId = null;
+            
+            displayMessages(currentChatMessages);
+            document.querySelector('.chat-title').textContent = chatData.title || `Chat ${chatData.id.substring(0, 8)}`;
+            saveCurrentChatState(chatData);
+        }
+
+        function saveCurrentChatState(chatData) {
+            try {
+                const currentState = {
+                    chatId: chatData.id,
+                    title: chatData.title,
+                    messages: chatData.messages,
+                    timestamp: new Date().toISOString()
+                };
+                localStorage.setItem('activeChat', JSON.stringify(currentState));
+                localStorage.setItem('activeChatId', chatData.id);
+            } catch (error) {
+                console.error('Error saving current chat state:', error);
+            }
+        }
+
+        function clearCurrentChatState() {
+            localStorage.removeItem('activeChat');
+            localStorage.removeItem('activeChatId');
+        }
+
+        function displayMessages(messages) {
+            const messagesContainer = document.getElementById('chatMessages');
+            messagesContainer.innerHTML = '';
+            
+            if (messages && messages.length > 0) {
+                messages.forEach(message => {
+                    addMessageToDOM(message.content, message.role || message.sender);
+                });
+            } else {
+                messagesContainer.innerHTML = `
+                    <div class="welcome-message">
+                        <h2>Welcome to Chatbox!</h2>
+                        <p>Start a conversation by typing your message below or upload documents to chat about.</p>
+                    </div>
+                `;
+            }
+        }
+
+        function addMessageToDOM(text, sender) {
+            const messagesContainer = document.getElementById('chatMessages');
+            
+            const welcomeMessage = messagesContainer.querySelector('.welcome-message');
+            if (welcomeMessage) {
+                welcomeMessage.remove();
+            }
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            messageDiv.textContent = text;
+            
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function updateSendButton() {
+            const sendBtn = document.getElementById('sendBtn');
+            sendBtn.disabled = isLoading;
+            sendBtn.innerHTML = isLoading ? '⏳' : '➤';
+        }
+
+        function showTypingIndicator() {
+            document.getElementById('typingIndicator').style.display = 'flex';
+            const messagesContainer = document.getElementById('chatMessages');
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function hideTypingIndicator() {
+            document.getElementById('typingIndicator').style.display = 'none';
+        }
+
+        function handleInputKeydownbbbbb(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+        function handleInputKeydown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+                // Reset textarea height after sending message
+                setTimeout(() => {
+                    resetTextareaHeight();
+                }, 100);
+            }
+        }
+
+        function handleInputResize(event) {
+            const textarea = event.target;
+            // Reset height to recalculate
+            textarea.style.height = 'auto';
+            
+            // Set new height based on scroll height with max limit
+            const newHeight = Math.min(textarea.scrollHeight, 120); // max 120px
+            textarea.style.height = newHeight + 'px';
+            
+            // Show scrollbar if content exceeds max height
+            textarea.style.overflowY = textarea.scrollHeight > 120 ? 'auto' : 'hidden';
+        }
+
+        function resetTextareaHeight() {
+            const textarea = document.getElementById('messageInput');
+            textarea.style.height = 'auto';
+            textarea.style.overflowY = 'hidden';
+        }
+        function logout() {
+            currentUser = null;
+            currentSessionId = null;
+            currentChatId = null;
+            newChatSessionId = null;
+            currentChatMessages = [];
+            
+            localStorage.removeItem('chatboxUser');
+            localStorage.removeItem('chatboxSessionId');
+            localStorage.removeItem('chatHistory');
+            
+            uploadedFiles = [];
+            
+            document.getElementById('appContainer').style.display = 'none';
+            document.body.classList.remove('chat-mode');
+            document.querySelector('.container').style.display = 'flex';
+            
+            document.getElementById('emailForm').reset();
+            goBackToEmail();
+        }
+
+        // Initialize event listeners
+        function initializeEventListeners() {
+            // Login form events
+            document.getElementById('emailForm').addEventListener('submit', requestOTP);
+            document.getElementById('otpForm').addEventListener('submit', verifyOTP);
+            document.getElementById('backBtn').addEventListener('click', goBackToEmail);
+            document.getElementById('resendLink').addEventListener('click', resendOTP);
+
+            // Registration events
+            document.getElementById('registerBtn').addEventListener('click', registerUser);
+            document.getElementById('showLoginBtn').addEventListener('click', showLoginScreen);
+
+            // Chat events
+            document.getElementById('sendBtn').addEventListener('click', sendMessage);
+            document.getElementById('messageInput').addEventListener('keydown', handleInputKeydown);
+            document.getElementById('messageInput').addEventListener('input', handleInputResize);
+            document.getElementById('newChatBtn').addEventListener('click', startNewChat);
+            document.getElementById('voiceBtn').addEventListener('click', toggleVoiceRecording);
+            document.getElementById('logoutBtn').addEventListener('click', logout);
+
+            // Upload popup event
+           // document.getElementById('uploadBtn').addEventListener('click', openUploadPopup);
+            // FIXED: Upload popup event - remove any file input listeners
+            const uploadBtn = document.getElementById('uploadBtn');
+            if (uploadBtn) {
+                // Remove any existing event listeners
+                uploadBtn.replaceWith(uploadBtn.cloneNode(true));
+                // Get the new reference and add our popup listener
+                document.getElementById('uploadBtn').addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openUploadPopup(currentUser);
+                });
+            }
+            // OTP input events
+            setupOTPInputs();
+        }
+
+        // Authentication functions
+        async function requestOTP(event) {
+            event.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const loginError = document.getElementById('loginError');
+            const emailBtn = document.getElementById('emailBtn');
+            console.log(email)
+            const allowedDomain = 'gmail.com';
+            const emailDomain = email.split('@')[1].toLowerCase();
+            if (emailDomain !== allowedDomain) {
+                loginError.textContent = `Email must be from the domain ${allowedDomain}`;
+                loginError.style.display = 'block';
+                return;
+            }            
+            loginError.style.display = 'none';
+            emailBtn.disabled = true;
+            emailBtn.textContent = 'Sending OTP...';
+
+            try {
+                if (email === 'demo@example.com') {
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                    showOTPStep(email);
+                    startOTPTimer();
+                    return;
+                }
+
+                try {
+                    const encodedEmail = encodeURIComponent(email);
+                    const url = `${FASTAPI_VERIFY_USER_URL}/${encodedEmail}`;
+                    const response = await fetch(url, { method: 'GET' });
+                    const result = await response.json();
+                                    
+                    if (response.ok) {
+                        const otpresponse = await fetch(FASTAPI_REQUEST_OTP_URL, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                email: email
+                            })
+                        });
+                        const otpresult = await otpresponse.json();
+                        showOTPStep(email);
+                        startOTPTimer();
+
+                    } else if (result.detail === "User not found") {
+                        showRegisterScreen();
+                        return;
+                    } else {
+                        throw new Error('Error checking user existence');
+                    }
+                } catch (error) {
+                    console.error('User verification error:', error);
+                    return true;
+                }
+            } catch (error) {
+                console.error('OTP request error:', error);
+                loginError.textContent = 'Failed to send OTP. Please try again.';
+                loginError.style.display = 'block';
+            } finally {
+                emailBtn.disabled = false;
+                emailBtn.textContent = 'Send OTP';
+            }
+        }
+
+        function showOTPStep() {
+            document.getElementById('emailStep').style.display = 'none';
+            document.getElementById('otpStep').classList.add('active');
+            document.getElementById('step1Dot').classList.remove('active');
+            document.getElementById('step2Dot').classList.add('active');
+            
+            startOTPTimer();
+            document.getElementById('otp1').focus();
+        }
+
+        async function verifyOTP(event) {
+            event.preventDefault();
+            
+            const otp = getOTPValue();
+            const email = document.getElementById('email').value;
+            const rememberMe = document.getElementById('rememberMe').checked;
+            const otpBtn = document.getElementById('otpBtn');
+            const loginError = document.getElementById('loginError');
+
+            // Email domain validation
+            const allowedDomain = 'gmail.com';
+            const emailDomain = email.split('@')[1].toLowerCase();
+            if (emailDomain !== allowedDomain) {
+                loginError.textContent = `Email must be from the domain ${allowedDomain}`;
+                loginError.style.display = 'block';
+                return;
+            }
+
+            if (otp.length !== 6) {
+                loginError.textContent = 'Please enter complete 6-digit OTP';
+                loginError.style.display = 'block';
+                return;
+            }
+
+            loginError.style.display = 'none';
+            otpBtn.disabled = true;
+            otpBtn.textContent = 'Verifying...';
+
+            try {
+                if (email === 'demo@example.com' && otp === '123456') {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    const sessionId = generateSessionId(email);
+                    const chatSessionId = generateChatSessionId();
+
+                    const user = {
+                        user_email: email,
+                        name: 'Demo User',
+                        id: 'demo-user-123',
+                        sessionId: sessionId,
+                        chatSessionId: chatSessionId,
+                        username: email.split('@')[0],
+                        loginTime: new Date().toISOString()
+                    };
+
+                    currentUser = user;
+                    currentSessionId = sessionId;
+
+                    localStorage.setItem('chatboxUser', JSON.stringify(user));
+                    localStorage.setItem('chatboxSessionId', sessionId);
+                    
+                    if (rememberMe) {
+                        const expiryDate = new Date();
+                        expiryDate.setDate(expiryDate.getDate() + 30);
+                        localStorage.setItem('sessionExpiry', expiryDate.toISOString());
+                    } else {
+                        localStorage.removeItem('sessionExpiry');
+                    }
+
+                    clearOTPTimer();
+                    showChatApp();
+                } else {
+                    const response = await fetch(FASTAPI_VERIFY_OTP_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            email: email,
+                            otp: otp
+                        })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        const sessionId = generateSessionId(email);
+                        const chatSessionId = generateChatSessionId();
+
+                        currentUser = {
+                            ...data,
+                            sessionId: sessionId,
+                            username: data.user_email.split('@')[0],
+                            chatSessionId: chatSessionId,
+                            loginTime: new Date().toISOString()
+                        };
+
+                        currentSessionId = sessionId;
+
+                        localStorage.setItem('chatboxUser', JSON.stringify(currentUser));
+                        localStorage.setItem('chatboxSessionId', sessionId);
+                        
+                        if (rememberMe) {
+                            const expiryDate = new Date();
+                            expiryDate.setDate(expiryDate.getDate() + 30);
+                            localStorage.setItem('sessionExpiry', expiryDate.toISOString());
+                        } else {
+                            localStorage.removeItem('sessionExpiry');
+                        }
+
+                        clearOTPTimer();
+                        showChatApp();
+                    } else {
+                        throw new Error('Invalid OTP');
+                    }
+                }
+            } catch (error) {
+                console.error('OTP verification error:', error);
+                loginError.textContent = 'Invalid OTP. Please try again.';
+                loginError.style.display = 'block';
+                clearOTPInputs();
+            } finally {
+                otpBtn.disabled = false;
+                otpBtn.textContent = 'Verify & Sign In';
+            }
+        }
+
+        async function registerUser() {
+            const email = document.getElementById('registerEmail').value;
+            const department = document.getElementById('department').value;
+            const username = email.split('@')[0];
+            const registerError = document.getElementById('registerError');
+
+            if (!email || !department) {
+                registerError.textContent = 'Please fill in all fields';
+                registerError.style.display = 'block';
+                return;
+            }
+
+            registerError.style.display = 'none';
+
+            try {
+                const response = await fetch(FASTAPI_REGISTER_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        email: email, 
+                        department: department,
+                        username: username 
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert('Registration successful! Please check your email for OTP.');
+                    document.getElementById('email').value = email;
+                    showLoginScreen();
+                } else {
+                    registerError.textContent = result.detail || 'Registration failed';
+                    registerError.style.display = 'block';
+                }
+                
+            } catch (error) {
+                console.error('Registration error:', error);
+                registerError.textContent = 'Registration failed. Please try again.';
+                registerError.style.display = 'block';
+            }
+        }
+
+        function getOTPValue() {
+            let otp = '';
+            for (let i = 1; i <= 6; i++) {
+                otp += document.getElementById(`otp${i}`).value;
+            }
+            return otp;
+        }
+
+        function goBackToEmail() {
+            document.getElementById('otpStep').classList.remove('active');
+            document.getElementById('emailStep').style.display = 'block';
+            document.getElementById('step2Dot').classList.remove('active');
+            document.getElementById('step1Dot').classList.add('active');
+            
+            clearOTPTimer();
+            clearOTPInputs();
+        }
+
+        function resendOTP() {
+            const resendLink = document.getElementById('resendLink');
+            if (resendLink.classList.contains('disabled')) {
+                return;
+            }
+
+            const email = document.getElementById('email').value;
+            
+            fetch(FASTAPI_REQUEST_OTP_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: email
+                })
+            }).then(response => {
+                if (response.ok) {
+                    showMessage('OTP resent successfully!', 'success');
+                    startOTPTimer();
+                } else {
+                    showError('Failed to resend OTP. Please try again.');
+                }
+            }).catch(error => {
+                console.error('Resend OTP error:', error);
+                showError('Failed to resend OTP. Please try again.');
+            });
+        }
+
+        function startOTPTimer() {
+            let timeLeft = 60;
+            const timerElement = document.getElementById('timer');
+            const resendLink = document.getElementById('resendLink');
+            
+            timerElement.style.display = 'inline';
+            resendLink.classList.add('disabled');
+            
+            otpTimer = setInterval(() => {
+                timerElement.textContent = `(${timeLeft}s)`;
+                timeLeft--;
+                
+                if (timeLeft < 0) {
+                    clearOTPTimer();
+                }
+            }, 1000);
+        }
+
+        function clearOTPTimer() {
+            if (otpTimer) {
+                clearInterval(otpTimer);
+                otpTimer = null;
+            }
+            
+            document.getElementById('timer').style.display = 'none';
+            document.getElementById('resendLink').classList.remove('disabled');
+        }
+
+        function clearOTPInputs() {
+            document.querySelectorAll('.otp-input').forEach(input => {
+                input.value = '';
+                input.classList.remove('filled');
+            });
+        }
+
+        function showRegisterScreen() {
+            document.getElementById('loginContainer').style.display = 'none';
+            document.getElementById('registerScreen').style.display = 'block';
+            document.getElementById('appContainer').style.display = 'none';
+            document.body.classList.remove('chat-mode');
+            
+            const email = document.getElementById('email').value;
+            if (email) {
+                document.getElementById('registerEmail').value = email;
+            }
+        }
+
+        function setupOTPInputs() {
+            const otpInputs = document.querySelectorAll('.otp-input');
+            otpInputs.forEach((input, index) => {
+                input.addEventListener('keyup', (e) => {
+                    if (e.key >= '0' && e.key <= '9') {
+                        input.classList.add('filled');
+                        if (index < otpInputs.length - 1) {
+                            otpInputs[index + 1].focus();
+                        }
+                    }
+                });
+
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Backspace' && input.value === '' && index > 0) {
+                        otpInputs[index - 1].focus();
+                    }
+                });
+            });
+        }
+
+        function showError(message) {
+            const errorElement = document.getElementById('loginError');
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+            
+            setTimeout(() => {
+                errorElement.style.display = 'none';
+            }, 5000);
+        }
+
+        function showMessage(message, type) {
+            const messageEl = document.createElement('div');
+            messageEl.className = type === 'success' ? 'demo-credentials' : 'error-message';
+            messageEl.textContent = message;
+            
+            const container = document.getElementById('loginContainer') || document.getElementById('registerScreen');
+            if (container) {
+                container.insertBefore(messageEl, container.firstChild);
+                
+                setTimeout(() => {
+                    messageEl.remove();
+                }, 3000);
+            }
+        }
+
+        // Voice recording functions
+        function toggleVoiceRecording() {
+            const voiceBtn = document.getElementById('voiceBtn');
+            
+            if (!isRecording) {
+                isRecording = true;
+                voiceBtn.classList.add('recording');
+                voiceBtn.textContent = '⏹️';
+                
+                setTimeout(() => {
+                    stopVoiceRecording();
+                }, 3000);
+            } else {
+                stopVoiceRecording();
+            }
+        }
+
+        function stopVoiceRecording() {
+            isRecording = false;
+            const voiceBtn = document.getElementById('voiceBtn');
+            voiceBtn.classList.remove('recording');
+            voiceBtn.textContent = '🎤';
+            
+            const messageInput = document.getElementById('messageInput');
+            if (messageInput) {
+                messageInput.value = "This is a voice message transcription.";
+            }
+        }
+
+        //Updated popup function with better error handling
+        function openUploadPopup(currentUser) {
+            console.log('Opening upload popup...',currentUser.username); // Debug log
+            
+            try {
+                const popupWidth = 700;
+                const popupHeight = 600;
+                const left = (screen.width - popupWidth) / 2;
+                const top = (screen.height - popupHeight) / 2;
+                
+                // Try different path variations
+                const possiblePaths = [
+                    'chatbox/upload.html',
+                    './upload.html',
+                    '../upload.html',
+                    '/upload.html'
+                ];
+                
+                let popup = null;
+                const popupUrl = `chatbox/upload.html?user=${encodeURIComponent(currentUser.username)}`;
+                
+                // Try to open the popup with the first path
+                popup = window.open(
+                    popupUrl,
+                    'uploadDocuments',
+                    `width=${popupWidth},height=${popupHeight},left=${left},top=${top},resizable=yes,scrollbars=yes,status=yes,menubar=no,toolbar=no,location=no`
+                );
+                
+                if (popup) {
+                    popup.focus();
+                    popup.postMessage({ user: currentUser.username }, window.location.origin);
+
+                    console.log('Popup opened successfully for user : ', currentUser.username);
+                    
+                    // Check if popup was blocked after a short delay
+                    setTimeout(() => {
+                        if (popup.closed || !popup.location) {
+                            console.error('Popup was blocked or closed');
+                            showPopupBlockedMessage();
+                        }
+                    }, 1000);
+                } else {
+                    console.error('Popup blocked by browser');
+                    showPopupBlockedMessage();
+                }
+                
+            } catch (error) {
+                console.error('Error opening popup:', error);
+                showPopupBlockedMessage();
+            }
+        }
+
+
+        function showPopupBlockedMessage() {
+            const message = `
+                Upload popup was blocked by your browser.
+                
+                Please:
+                1. Allow popups for this site in your browser settings
+                2. Or use Ctrl+Click on the upload button
+                3. Make sure you're running the site on a web server (not file://)
+                
+                Would you like to try the fallback upload method?
+            `;
+            
+            if (confirm(message)) {
+                // Fallback: Create a temporary file input
+                createFallbackFileInput();
+            }
+        }
+
+
+        //Fallback file input method
+        function createFallbackFileInput() {
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = '.pdf,.doc,.docx,.txt,.csv,.xlsx,.xls,.pptx,.ppt,.json,.xml,.html,.md';
+            fileInput.multiple = true;
+            fileInput.style.display = 'none';
+            
+            fileInput.addEventListener('change', function(e) {
+                const files = Array.from(e.target.files);
+                if (files.length > 0) {
+                    handleFallbackUpload(files);
+                }
+                // Remove the temporary input
+                document.body.removeChild(fileInput);
+            });
+            
+            document.body.appendChild(fileInput);
+            fileInput.click();
+        }
+
+        async function handleFallbackUpload(files) {
+            console.log('Processing files via fallback method:', files);
+            
+            try {
+                const formData = new FormData();
+                
+                files.forEach(file => {
+                    formData.append('files', file);
+                });
+                
+                // Add metadata
+                formData.append('user_id', currentUser?.user_email || 'demo');
+                formData.append('chat_id', currentChatId || generateChatSessionId());
+                
+                // Show progress in chat
+                const fileNames = files.map(f => f.name).join(', ');
+                addMessageToDOM(`📤 Uploading files: ${fileNames}`, 'system');
+                
+                // Call upload API
+                const response = await fetch(FASTAPI_UPLOAD_PROCESS, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'Authorization': `Bearer ${currentUser?.session_token || 'demo-token'}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    addMessageToDOM(`✅ Successfully uploaded: ${fileNames}`, 'system');
+                    
+                    // Update uploaded files array
+                    files.forEach(file => {
+                        uploadedFiles.push({
+                            id: 'uploaded_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                            name: file.name,
+                            uploadedAt: new Date().toISOString(),
+                            processed: true
+                        });
+                    });
+                } else {
+                    throw new Error(`Upload failed with status: ${response.status}`);
+                }
+                
+            } catch (error) {
+                console.error('Fallback upload error:', error);
+                addMessageToDOM(`❌ Upload failed: ${error.message}`, 'system');
+            }
+        }        
+
+        // Listen for messages from popup
+        window.addEventListener('message', function(event) {
+            if (event.origin !== window.location.origin) {
+                return;
+            }
+            
+            if (event.data.type === 'upload_success') {
+                handleUploadSuccess(event.data);
+            } else if (event.data.type === 'upload_error') {
+                handleUploadError(event.data);
+            }
+        });
+
+        // Handle successful upload
+        function handleUploadSuccess(data) {
+            console.log('Upload successful:', data);
+            
+            let message = '';
+            if (data.files && data.files.length > 0) {
+                message += `📎 Successfully uploaded files: ${data.files.join(', ')}`;
+            }
+            if (data.urls && data.urls.length > 0) {
+                if (message) message += '\n';
+                message += `🌐 Successfully added URLs: ${data.urls.join(', ')}`;
+            }
+            
+            addMessageToDOM(message, 'system');
+            
+            if (data.files) {
+                data.files.forEach(fileName => {
+                    uploadedFiles.push({
+                        id: 'uploaded_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                        name: fileName,
+                        uploadedAt: new Date().toISOString(),
+                        processed: true
+                    });
+                });
+            }
+        }
+
+        // Handle upload error
+        function handleUploadError(data) {
+            console.error('Upload error:', data);
+            addMessageToDOM(`❌ Upload failed: ${data.error}`, 'system');
+        }
+
+        // Auto-save functionality
+        function autoSave() {
+            if (currentChatId && currentChatMessages.length > 0) {
+                try {
+                    let chatHistory = [];
+                    try {
+                        const localData = localStorage.getItem('chatHistory');
+                        if (localData) {
+                            const parsed = JSON.parse(localData);
+                            chatHistory = Array.isArray(parsed) ? parsed : [];
+                        }
+                    } catch (parseError) {
+                        chatHistory = [];
+                    }
+
+                    const existingChatIndex = chatHistory.findIndex(chat => chat.id === currentChatId);
+                    
+                    const updatedChat = {
+                        id: currentChatId,
+                        title: document.querySelector('.chat-title')?.textContent || 'Chat',
+                        messages: currentChatMessages,
+                        created_at: existingChatIndex >= 0 ? chatHistory[existingChatIndex].created_at : new Date().toISOString(),
+                        updated_at: new Date().toISOString(),
+                        user_id: currentUser?.username
+                    };
+                    
+                    if (existingChatIndex >= 0) {
+                        chatHistory[existingChatIndex] = updatedChat;
+                        chatHistory.splice(existingChatIndex, 1);
+                        chatHistory.unshift(updatedChat);
+                    } else {
+                        chatHistory.unshift(updatedChat);
+                    }
+                    
+                    if (chatHistory.length > 50) {
+                        chatHistory = chatHistory.slice(0, 50);
+                    }
+                    
+                    localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+                    saveCurrentChatState(updatedChat);
+                    
+                } catch (error) {
+                    console.error('Error during auto-save:', error);
+                }
+            }
+        }
+
+        // Auto-save every 30 seconds
+        setInterval(autoSave, 30000);
+
+        // Save on page unload
+        window.addEventListener('beforeunload', autoSave);
+
+        // Save when tab becomes inactive
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                autoSave();
+            }
+        });
+
+        console.log('Chat Application JavaScript loaded successfully!');
+    </script>
+</body>
+</html>
