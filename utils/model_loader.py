@@ -61,7 +61,7 @@ class ModelLoader:
                 asyncio.set_event_loop(asyncio.new_event_loop())
 
             return OllamaEmbeddings(
-                model=model_name            )
+                model=model_name)
         except Exception as e:
             log.error("Error loading embedding model", error=str(e))
             raise ChatBoxException("Failed to load embedding model", sys)
