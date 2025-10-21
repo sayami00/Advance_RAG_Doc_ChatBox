@@ -3,8 +3,8 @@ import sys
 import json
 from dotenv import load_dotenv
 from utils.config_loader import load_config
-from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
-from langchain_openai import ChatOpenAI
+#from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
+#from langchain_openai import ChatOpenAI
 from langchain_groq import ChatGroq
 from langchain_ollama import ChatOllama
 from langchain_ollama import OllamaEmbeddings

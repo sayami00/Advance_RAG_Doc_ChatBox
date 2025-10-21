@@ -5,13 +5,17 @@ from fastapi import UploadFile
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import (
-    PyPDFLoader, Docx2txtLoader, UnstructuredExcelLoader
+    PyPDFLoader, Docx2txtLoader, UnstructuredExcelLoader,TextLoader
 )
 
 from logger import GLOBAL_LOGGER as log
 from exception.custom_exception import ChatBoxException
 from utils.model_loader import ModelLoader
 from langchain_chroma import Chroma
+from langchain_qdrant import QdrantVectorStore
+from qdrant_client import QdrantClient
+from qdrant_client.http import models
+import hashlib
 
 # 🔧 FastAPI File Adapter
 class FastAPIFileAdapter:
@@ -103,6 +107,8 @@ class DocumentProcessor:
             loader = Docx2txtLoader(full_path)
         elif file_path.endswith(".xlsx"):
             loader = UnstructuredExcelLoader(full_path)
+        elif file_path.endswith(".txt"):
+            loader = TextLoader(full_path)
         else:
             raise ValueError("Unsupported file type")
 
@@ -117,7 +123,7 @@ class DocumentProcessor:
         )
         return splitter.split_documents(documents)
 
-    def add_to_chroma(self, chunks: List[Document], collection_name: str):
+    def add_to_vectorestore(self, chunks: List[Document], collection_name: str):
         db = self.chroma_manager.get_db(collection_name)
         chunks = self.calculate_chunk_ids(chunks)
 
@@ -169,3 +175,146 @@ class DocumentProcessor:
     def process_web_document(self, documents: List[Document], collection_name: str):
         chunks = self.split_documents(documents)
         self.add_to_chroma(chunks, collection_name)
+
+
+
+
+# -------------------------------
+# Qdrant Manager
+# -------------------------------
+class QdrantManager:
+    def __init__(self, url: str = "http://localhost:6333", collection_path: str = None):
+        self.url = url
+        self.client = QdrantClient(url=self.url)
+        self.embeddings = ModelLoader().load_embeddings()
+        self.collection_path = collection_path  # (optional future control)
+        
+    def ensure_collection(self, collection_name: str, vector_size: int = 768):
+        """Create the collection if it doesn't exist."""
+        collections = [c.name for c in self.client.get_collections().collections]
+        if collection_name not in collections:
+            self.client.create_collection(
+                collection_name=collection_name,
+                vectors_config=models.VectorParams(size=vector_size, distance=models.Distance.COSINE)
+            )
+            print(f"✅ Created Qdrant collection: {collection_name}")
+
+    def get_store(self, collection_name: str):
+        """Get (or create) a vector store handle."""
+        self.ensure_collection(collection_name)
+        return QdrantVectorStore(
+            client=self.client,
+            collection_name=collection_name,
+            embedding=self.embeddings
+        )
+
+# -------------------------------
+# Document Processor
+# -------------------------------
+class DocumentProcessor_Qdrant:
+    def __init__(self, data_source_path: str = "data/tempfile"):
+        self.data_source_path = data_source_path
+        # Connect to Qdrant server
+        self.qdrant_manager = QdrantManager(url="http://localhost:6333")
+    
+    def duplicate_validation(self, file_path: str, collection_name: str):
+        """Check if a document already exists in Qdrant by 'source' metadata."""
+        store = self.qdrant_manager.get_store(collection_name)
+        full_path = os.path.join(self.data_source_path, file_path)
+
+        # Scroll without extra arguments
+        existing_points, _ = store.client.scroll(
+            collection_name=collection_name,
+            limit=1000
+        )
+
+        # Check if any point has the same source
+        for point in existing_points:
+            if point.payload.get("source") == full_path:
+                return True
+        return False
+
+    def load_document(self, file_path: str) -> List[Document]:
+        full_path = os.path.abspath(file_path)
+        log.info(f"Loading document: {full_path}")
+
+        if file_path.endswith(".pdf"):
+            loader = PyPDFLoader(full_path)
+        elif file_path.endswith(".docx"):
+            loader = Docx2txtLoader(full_path)
+        elif file_path.endswith(".xlsx"):
+            loader = UnstructuredExcelLoader(full_path)
+        elif file_path.endswith(".txt"):
+            loader = TextLoader(full_path)
+        else:
+            raise ValueError(f"Unsupported file type: {file_path}")
+
+        return loader.load()
+
+    def split_documents(self, documents: List[Document]) -> List[Document]:
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200,
+            length_function=len,
+            is_separator_regex=False,
+        )
+        return splitter.split_documents(documents)
+
+
+    @staticmethod
+    def calculate_chunk_ids(chunks: List[Document]) -> List[Document]:
+        for chunk in chunks:
+            # Use file path + page + chunk index to generate a unique hash
+            source = chunk.metadata.get("source", "unknown_source")
+            page = chunk.metadata.get("page")
+            page_str = str(page) if page is not None else "0"
+
+            # Create a short hash for the point ID
+            unique_string = f"{source}:{page_str}:{chunk.page_content[:50]}"  # first 50 chars
+            point_id = hashlib.md5(unique_string.encode("utf-8")).hexdigest()
+
+            chunk.metadata["id"] = point_id
+
+        return chunks
+
+
+
+    def add_to_vectorestore(self, chunks: List[Document], collection_name: str):
+        store = self.qdrant_manager.get_store(collection_name)
+        chunks = self.calculate_chunk_ids(chunks)
+
+        # Scroll without include_payload
+        existing_points, _ = store.client.scroll(
+            collection_name=collection_name,
+            limit=1000
+        )
+
+        existing_ids = {point.id for point in existing_points}
+        log.info(f"Existing documents in Qdrant: {len(existing_ids)}")
+
+        new_chunks = [c for c in chunks if c.metadata["id"] not in existing_ids]
+
+        if not new_chunks:
+            log.info("No new chunks to add.")
+            return
+
+        texts = [c.page_content for c in new_chunks]
+        metadatas = [c.metadata for c in new_chunks]
+        ids = [c.metadata["id"] for c in new_chunks]
+
+        store.add_texts(texts=texts, metadatas=metadatas, ids=ids)
+        log.info(f"Added {len(new_chunks)} new chunks to collection '{collection_name}'")
+
+    def clear_database(self):
+        log.warning(
+            "Clearing Qdrant collections must be done via server API. Local folder not used in server mode."
+        )
+
+    def process_local_document(self, file_path: str, collection_name: str):
+        documents = self.load_document(file_path)
+        chunks = self.split_documents(documents)
+        self.add_to_qdrant(chunks, collection_name)
+
+    def process_web_document(self, documents: List[Document], collection_name: str):
+        chunks = self.split_documents(documents)
+        self.add_to_qdrant(chunks, collection_name)

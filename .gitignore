@@ -11,4 +11,6 @@ wheels/
 .env
 logs
 data/
-database/
+database
+*copy.py
+database/*.db

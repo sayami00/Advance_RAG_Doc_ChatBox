@@ -37,11 +37,13 @@ class ChatDBOperation:
         """
         # Mapping logic
         if ragtype == "Mydepartment":
-                return f"{user_department}_Docs"  # fallback per department
-        
+            return f"{user_department}_Docs"  # fallback per department
         elif ragtype == "ITServicesGlobal":
             return "GlobalITServicesDB"
-        
+        elif ragtype == "ITDesk":
+            return "GlobalITServicesDB"
+        elif ragtype == "HRDesk":
+            return "GlobalHRServicesDB"         
         elif ragtype == "GPTs":
             return "GPTCollection"
         

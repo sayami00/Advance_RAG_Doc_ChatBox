@@ -6,7 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from langchain_core.messages import HumanMessage
 from fastapi.responses import FileResponse
-from workflow.langgraph_function import AgenticRag
+#from workflow.langgraph_function import AgenticRAG
+from workflow.langgraph_function_guardrails import AgenticRAG
 from workflow.responsemodel import responsemodel
 from utils.db_loader import UserRepository
 from utils.db_loader import get_db
@@ -17,7 +18,7 @@ from typing import Optional,List,Any
 from datetime import datetime,timedelta
 import os
 from logger import GLOBAL_LOGGER as log
-from workflow.document_function import DocHandler,FastAPIFileAdapter,DocumentProcessor
+from workflow.document_function import DocHandler,FastAPIFileAdapter,DocumentProcessor,DocumentProcessor_Qdrant
 
 
 import os
@@ -27,8 +28,8 @@ import sys
 # Global OTP handler instance
 otp_ops = OtpOperation()
 chat_ops = ChatDBOperation()
-chatbot_app = AgenticRag()
-
+#chatbot_app = AgenticRAG()
+chatbot_app = AgenticRAG(use_guardrails=True, strict_mode=False)
 
 app = FastAPI()
 # Configure CORS
@@ -240,13 +241,13 @@ async def chat_query_langgraph(
     #,
     #session_id: str = Depends(verify_session)
 ):
-    print(request.query)
-    print(request.session_id)
-    print(request.chat_id)
-    print(request.email)
-    print(request.use_rag)
-    print(request.user_id)
-    print(request.ragtype)
+    # print(request.query)
+    # print(request.session_id)
+    # print(request.chat_id)
+    # print(request.email)
+    # print(request.use_rag)
+    # print(request.user_id)
+    # print(request.ragtype)
 
     #setragtype(request.ragtype)
     # Configuration for conversation thread
@@ -281,11 +282,19 @@ async def upload_process(
         raise HTTPException(status_code=400, detail="No files uploaded.")
 
     user_department = chat_ops.get_user_info(current_user)
-    collection_name = chat_ops.get_collection("Mydepartment", user_department)
-    department_temp_path = user_department.replace(" ", "")
-
     dh = DocHandler()
-    dp = DocumentProcessor()
+    if user_department == "IT-GLobal":
+        collection_name = chat_ops.get_collection("IT-GLobal", user_department)
+        #dp= DocumentProcessor_Qdrant()
+        dp = DocumentProcessor()   
+
+    else:
+        collection_name = chat_ops.get_collection("Mydepartment", user_department)
+        #dp = DocumentProcessor() 
+        dp= DocumentProcessor_Qdrant()
+  
+    department_temp_path = user_department.replace(" ", "")
+    log.info(f"User '{current_user}' from {user_department} trying to load doc in collection {collection_name}.")
     processed_files = []
 
     for file in files:
@@ -305,7 +314,7 @@ async def upload_process(
             log.info(f"🔍 No duplicate found. Processing file: {file.filename}")
             documents = dp.load_document(temp_saved_path)
             chunks = dp.split_documents(documents)
-            dp.add_to_chroma(chunks, collection_name)
+            dp.add_to_vectorestore(chunks, collection_name)
             log.info(f"✅ File '{file.filename}' processed and added to ChromaDB.")
 
             # Optional: move file to permanent storage (implement save_file if needed)
@@ -323,179 +332,6 @@ async def upload_process(
         "files_processed": processed_files,
         "urls_received": urls or [],
     }
-
-
-
-
-# @app.post("/analyze")
-# async def analyze_document(file: UploadFile = File(...)) -> Any:
-#     try:
-#         log.info(f"Received file : {file.filename}")
-#         dh = DocHandler()
-#         saved_path = dh.save_pdf(FastAPIFileAdapter(file))
-#         text = read_pdf_via_handler(dh, saved_path)
-#         analyzer = DocumentAnalyzer()
-#         result = analyzer.analyze_document(text)
-#         log.info("Document analysis complete.")
-#         return JSONResponse(content=result)
-#     except HTTPException:
-#         raise
-#     except Exception as e:
-#         log.exception("Error during document analysis")
-#         raise HTTPException(status_code=500, detail=f"Analysis failed: {e}")
-    
-
-
-# @app.post("/uploadprocess")
-# async def upload_process(
-#     current_user: str = Form(...),
-#     files: Optional[List[UploadFile]] = File(None),
-#     urls: Optional[List[str]] = Form(None),
-# ):
-#     if not files:
-#         raise HTTPException(status_code=400, detail="No files uploaded.")
-#     userdepartment = chat_ops.get_user_info(current_user)
-#     collection_name = chat_ops.get_collection("Mydepartment", userdepartment)
-#     departmenttemppath = userdepartment.replace(" ", "")
-
-#     file_details = []
-#     dh = DocHandler()
-#     dp = DocumentProcessor()
-#     try:
-#         processed_files = []
-#         for file in files:
-#             log.info(f"Received file: {file.filename}")
-#             # Await the async save
-#             temp_saved_path = await dh.temp_save_file(FastAPIFileAdapter(file), departmenttemppath)
-#             existingdoc = dp.duplicate_validation(file.filename,collection_name)
-#             if existingdoc and len(existingdoc["ids"]) > 0:
-#                 log.info(f"⚠️ File '{file.filename}' already exists in ChromaDB. Skipping upload.")
-#                 os.remove(temp_saved_path)  # remove temp file
-#             else:
-#                 save_processed_doc=[]
-#                 log.info(f"No Duplicate.loading file starts: {file.filename}")
-#                 documents = dp.load_document(temp_saved_path)
-#                 log.info(f"document loaded for DB")
-#                 chunks = dp.split_documents(documents)
-#                 log.info(f"chunks created for DB")
-#                 dp.add_to_chroma(chunks,collection_name)
-#                 log.info(f"vetor added to  DB")
-#                 save_processed_doc = await dh.save_file(temp_saved_path,file.filename, departmenttemppath)
-#                 try:
-#                     if save_processed_doc:
-#                         log.info(f"File processed: {save_processed_doc}")
-#                         processed_files.append()
-#                 except Exception as e:
-#                     log.exception("File processing 111 failed.")
-#                     raise HTTPException(status_code=500, detail=f"File processing 111 failed: {e}")
-#     except Exception as e:
-#         log.exception("File processing 222 failed.")
-#         raise HTTPException(status_code=500, detail=f"File processing 222 failed: {e}")
-
-#     return {
-#         "status": "success",
-#         "current_user": current_user,
-#         "files_processed": processed_files,
-#         "urls_received": urls or [],
-#     }
-
-# @app.post("/uploadprocessnew")
-# async def upload_process(
-#     current_user: str = Form(...),
-#     file: UploadFile = File(...),
-#     urls: Optional[List[str]] = Form(None),
-# ):  
-#     print("here i am ")
-#     userdepartment=await chat_ops.get_user_info(current_user)
-#     departmenttemppath = userdepartment.replace(" ", "") 
-#     collection_name=await chat_ops.get_collection("Mydepartment",userdepartment)
-#     try:
-#         log.info(f"Received file : {file.filename} --> {departmenttemppath}")
-#         dh = DocHandler()
-#         #saved_path = dh.temp_save_pdf(FastAPIFileAdapter(file),departmenttemppath)
-#     except HTTPException:
-#         raise
-#     except Exception as e:
-#         log.exception("Error during document analysis")
-#         raise HTTPException(status_code=500, detail=f"Analysis failed: {e}")    
-#     return {
-#             "status": "success",
-#             "current_user": current_user,
-#             "files_processed": file.filename,
-#             "urls_received": urls or [],
-#             "file_count": len(file.filename)
-#         }
-# @app.post("/uploadprocessbak")
-# async def upload_process(
-#     current_user: str = Form(...),
-#     files: Optional[List[UploadFile]] = File(None),
-#     urls: Optional[List[str]] = Form(None),
-# ):
-#     userdepartment=chat_ops.get_user_info(current_user)
-#     collection_name=chat_ops.get_collection("Mydepartment",userdepartment)
-#     try:
-#         print(f"User uploading: {current_user}")
-#         saved_files = []
-
-#         if files:
-#             for file in files:
-#                 print(f"Processing file: {file.filename}")
-
-#                 # ✅ check file extension
-#                 if not file.filename.lower().endswith((".pdf", ".docx", ".xlsx", ".txt", ".csv")):
-#                     raise HTTPException(
-#                         status_code=400,
-#                         detail=f"File type not allowed: {file.filename}"
-#                     )
-
-#                 # Save upload temporarily
-#                 clean_department = userdepartment.replace(" ", "") 
-#                 departmenttemppath = os.path.join(UPLOAD_DIR,clean_department)
-#                 os.makedirs(departmenttemppath, exist_ok=True)
-#                 file_path = os.path.join(departmenttemppath, file.filename)
-#                 content = await file.read()
-#                 with open(file_path, "wb") as f:
-#                     f.write(content)
-#                 print(f"upload file successful: {file.filename}")
-                
-#                 # 🔍 Duplicate validation
-
-#                 #print(collection_name)
-#                 existingdoc = duplicatevalidation(file.filename,collection_name)
-#                 if existingdoc and len(existingdoc["ids"]) > 0:
-#                     print(f"⚠️ File '{file.filename}' already exists in ChromaDB. Skipping upload.")
-#                     os.remove(file_path)  # remove temp file
-#                 else:
-#                     print(f"loading file starts: {file.filename}")
-                    
-#                     documents = load_document(file_path)
-#                     chunks = split_documents(documents)
-#                     add_to_chroma(chunks,collection_name)
-#                     print("here i am ")
-#                     # Count files in upload dir
-#                     file_count = len([
-#                         f for f in os.listdir(UPLOAD_DIR)
-#                         if os.path.isfile(os.path.join(UPLOAD_DIR, f))
-#                     ])
-
-#                     # Move processed file
-#                     processeddepartmentpath= os.path.join(processed_dir,clean_department)
-#                     os.makedirs(processeddepartmentpath, exist_ok=True)
-#                     destination = os.path.join(processeddepartmentpath, file.filename)
-#                     shutil.move(file_path, destination)
-
-#                     print(f"✅ File moved to processed: {destination}")
-#                     saved_files.append(destination)
-
-#         return {
-#             "status": "success",
-#             "current_user": current_user,
-#             "files_processed": saved_files,
-#             "urls_received": urls or [],
-#             "file_count": len(saved_files)
-#         }
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
 
 
 

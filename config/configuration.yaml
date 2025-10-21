@@ -1,12 +1,13 @@
-astra_db:
-  collection_name: "ecommercedata"
-
 embedding_model:
   provider: "ollama"
   model_name: "nomic-embed-text:latest"
 
+chroma_db:
+  CHROMA_PATH : "data/chroma"
+
 retriever:
   top_k: 4
+  use_llm_compression: False
 
 llm:
   groq:

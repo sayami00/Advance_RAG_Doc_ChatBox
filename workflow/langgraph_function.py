@@ -1,435 +1,246 @@
-
-from typing import TypedDict, Annotated,Sequence,Literal
-from langgraph.graph import StateGraph, END,START
+from typing import TypedDict, Sequence, Annotated, List, Any
+from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
-from langchain_core.messages import HumanMessage, AIMessage,BaseMessage
-from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langgraph.checkpoint.sqlite import SqliteSaver
-from typing import List, Optional, Dict, Any
-from datetime import datetime
-from langchain.schema.runnable import RunnableConfig
-import sqlite3
+from langchain_core.runnables import RunnableConfig
 from utils.model_loader import ModelLoader
 from retriever.retrieval import Retriever
 from prompt_lib.prompts import PROMPT_REGISTRY, PromptType
-from langgraph.checkpoint.sqlite import SqliteSaver
 import sqlite3
-from pydantic import BaseModel, EmailStr
-from typing import Optional,List
 
 
+class AgenticRAG:
 
-class AgenticRag:
-
-    class BasicChatState(TypedDict): 
-        #messages: Annotated[list, add_messages]
+    class BasicChatState(TypedDict):
         messages: Annotated[Sequence[BaseMessage], add_messages]
-
+        context: str  # 🔧 Add explicit context field
 
     def __init__(self):
-        self.retriever_obj = Retriever()
+        self.retriever_obj = Retriever(use_qdrant=True)
         self.model_loader = ModelLoader()
         self.llm = self.model_loader.load_llm()
+
         self.sqlite_conn = sqlite3.connect("database/checkpoint.db", check_same_thread=False)
         self.checkpointer = SqliteSaver(self.sqlite_conn)
+
         self.workflow = self._build_workflow()
         self.app = self.workflow.compile(checkpointer=self.checkpointer)
 
-    # ---------- Helpers ----------
     def _format_docs(self, docs) -> str:
+        """Format retrieved docs into a string for prompt."""
         if not docs:
-            return "No relevant documents found."
-
+            return ""
         formatted_docs = []
-        source_list = []  # To collect source information
-        
         for d in docs:
-            meta = d.metadata or {}
-            formatted = (
-                f"Source: {meta.get('source_file', 'N/A')}\n"
-                f"page:\n{d.page_content.strip()}"
+            meta = getattr(d, "metadata", {}) or {}
+            formatted_docs.append(
+                f"Source: {meta.get('source', 'N/A')}\nPage:\n{d.page_content.strip()}"
             )
-            formatted_docs.append(formatted)
-        return "\n\n---\n\n".join(formatted_docs) 
+        return "\n\n---\n\n".join(formatted_docs)
 
-
-    # ---------- Nodes ----------
-    def _ai_assistant(self, state: BasicChatState):
-        print("--- CALL ASSISTANT ---")
-        messages = state["messages"]
-        last_message = messages[-1].content
-
-        if any(word in last_message.lower() for word in ["Source", "page"]):
-            return {"messages": [HumanMessage(content="TOOL: retriever")]}
-        else:
-            prompt = ChatPromptTemplate.from_template(
-                "You are a helpful assistant. Answer the user directly.\n\nQuestion: {question}\nAnswer:"
-            )
-            chain = prompt | self.llm | StrOutputParser()
-            response = chain.invoke({"question": last_message})
-            return {"messages": [HumanMessage(content=response)]}
-    
-    def _vector_retriever(self, state: BasicChatState):
+    def _rewrite_query(self, question: str, chat_history: str) -> str:
+        """🔧 FIXED: Rewrite follow-up questions to be standalone"""
+        if not chat_history or len(question.split()) > 8:
+            # Don't rewrite if no history or question is already detailed
+            return question
         
+        rewrite_prompt = f"""Rewrite this follow-up question to be a standalone question that includes necessary context.
+
+Conversation history:
+{chat_history}
+
+Follow-up question: {question}
+
+Standalone question (be concise):"""
+        
+        try:
+            response = self.llm.invoke(rewrite_prompt)
+            
+            # 🔧 Extract string content from AIMessage
+            if hasattr(response, 'content'):
+                rewritten = response.content.strip()
+            elif isinstance(response, str):
+                rewritten = response.strip()
+            else:
+                rewritten = str(response).strip()
+            
+            # 🔧 Clean up any extra formatting
+            # Remove quotes if the LLM added them
+            if rewritten.startswith('"') and rewritten.endswith('"'):
+                rewritten = rewritten[1:-1]
+            elif rewritten.startswith("'") and rewritten.endswith("'"):
+                rewritten = rewritten[1:-1]
+            
+            print(f"🔄 Query rewritten: '{question}' → '{rewritten}'")
+            return rewritten
+        except Exception as e:
+            print(f"⚠️ Query rewrite failed: {e}, using original query")
+            return question  # Fallback to original
+
+    def _extract_score(self, doc) -> float:
+        """🔧 Extract relevance score from document (handles multiple storage locations)"""
+        # Try multiple locations where score might be stored
+        
+        # 1. Direct attribute
+        if hasattr(doc, 'score') and doc.score is not None:
+            return float(doc.score)
+        
+        # 2. Metadata dict
+        if hasattr(doc, 'metadata') and isinstance(doc.metadata, dict):
+            if 'score' in doc.metadata:
+                return float(doc.metadata['score'])
+            # Sometimes stored as _score or relevance_score
+            if '_score' in doc.metadata:
+                return float(doc.metadata['_score'])
+            if 'relevance_score' in doc.metadata:
+                return float(doc.metadata['relevance_score'])
+        
+        # 3. No score found
+        return None
+
+    def _vector_retriever(self, state: BasicChatState, config: RunnableConfig = None):
+        """🔧 FIXED: Proper retriever configuration with score tracking"""
         print("--- RETRIEVER ---")
-        query = state["messages"][-1].content
-        retriever = self.retriever_obj.load_retriever()
-        docs = retriever.invoke(query)
-        context = self._format_docs(docs)
-        return {"messages": [HumanMessage(content=context)]}    
-
-    def _grade_documents(self, state: BasicChatState) -> Literal["generator", "rewriter"]:
-        print("--- GRADER ---")
-        question = state["messages"][0].content
-        docs = state["messages"][-1].content
-
-        prompt = PromptTemplate(
-            template="""You are a grader. Question: {question}\nDocs: {docs}\n
-            Are docs relevant to the question? Answer yes or no.""",
-            input_variables=["question", "docs"],
-        )
-        chain = prompt | self.llm | StrOutputParser()
-        score = chain.invoke({"question": question, "docs": docs})
-        return "generator" if "yes" in score.lower() else "rewriter"
-    
-    def _generate(self, state: BasicChatState):
-        print("--- GENERATE ---")
-        question = state["messages"][0].content
-        docs = state["messages"][-1].content
-        prompt = ChatPromptTemplate.from_template(
-            PROMPT_REGISTRY[PromptType.DOC_BOT].template
-        )
-        chain = prompt | self.llm | StrOutputParser()
-        response = chain.invoke({"context": docs, "question": question})
-        return {"messages": [HumanMessage(content=response)]}
-
-    def _rewrite(self, state: BasicChatState):
-        print("--- REWRITE ---")
-        question = state["messages"][0].content
-        new_q = self.llm.invoke(
-            [HumanMessage(content=f"Rewrite the query to be clearer: {question}")]
-        )
-        return {"messages": [HumanMessage(content=new_q.content)]}
         
+        # Get original query
+        query = state["messages"][-1].content
+        
+        # 🔧 Optional: Rewrite query using chat history for follow-up questions
+        chat_messages = [msg for msg in state["messages"][:-1] 
+                        if isinstance(msg, (HumanMessage, AIMessage))]
+        if len(chat_messages) >= 2:
+            # Build mini history for context
+            recent_history = f"User: {chat_messages[-2].content}\nAssistant: {chat_messages[-1].content}"
+            query = self._rewrite_query(query, recent_history)
+        
+        collection_name = config.get("configurable", {}).get("collection_name", "defaultdb")
+        print(f"Using collection: {collection_name} for query: {query}")
+
+
+        # 🔧 Load retriever with proper score threshold (0.5 = moderate relevance)
+        retriever = self.retriever_obj.load_retriever_chroma(
+        #retriever = self.retriever_obj.load_retriever_qdrant(
+            collection_name=collection_name,
+            top_k=5,
+            #score_threshold=0.3  # 🔧 Lowered to 0.3 for testing - adjust as needed
+        )
+        
+        # 🔧 Retriever now automatically filters by score_threshold
+        docs = retriever.invoke(query)
+
+        if not docs:
+            print(f"⚠️ No relevant documents found for query: '{query}' (score < 0.3)")
+            return {"context": ""}
+
+        context = self._format_docs(docs)
+
+        print(f"Retrieved {len(docs)} relevant document(s)")
+        for i, doc in enumerate(docs):
+            score = self._extract_score(doc)
+            score_display = f"{score:.3f}" if score is not None else "N/A"
+            
+            print(f"\n--- Document {i+1} ---")
+            print(f"Score: {score_display}")
+            print(f"Content:\n{doc.page_content[:200]}...")
+            if hasattr(doc, "metadata"):
+                # Print metadata without score fields to reduce clutter
+                meta_clean = {k: v for k, v in doc.metadata.items() 
+                             if k not in ['score', '_score', 'relevance_score']}
+                if meta_clean:
+                    print(f"Metadata: {meta_clean}")
+
+        return {"context": context}
+
+    def _generate(self, state: BasicChatState):
+        """🔧 FIXED: Better context/history handling"""
+        print("--- GENERATE ---")
+
+        # 🔧 Get context from state field, not from messages
+        context = state.get("context", "").strip()
+        
+        # Get only Human and AI messages for history
+        chat_messages = [msg for msg in state["messages"] 
+                        if isinstance(msg, (HumanMessage, AIMessage))]
+        
+        # Latest question is the last HumanMessage
+        question = chat_messages[-1].content.strip() if chat_messages else ""
+
+        # 🔧 Build history from last N exchanges (excluding current question)
+        history_pairs = []
+        i = len(chat_messages) - 2  # Start before the current question
+        pair_count = 0
+        
+        while i >= 0 and pair_count < 5:  # Last 5 exchanges
+            if i > 0 and isinstance(chat_messages[i], AIMessage) and isinstance(chat_messages[i-1], HumanMessage):
+                history_pairs.insert(0, f"User: {chat_messages[i-1].content.strip()}\nAssistant: {chat_messages[i].content.strip()}")
+                pair_count += 1
+                i -= 2
+            else:
+                i -= 1
+
+        chat_history = "\n\n".join(history_pairs)
+
+        # Debug info
+        print(f"Context length: {len(context)} chars")
+        print(f"Chat history pairs: {len(history_pairs)}")
+        print(f"Question: {question}")
+
+        # 🔧 Handle no relevant context
+        if not context:
+            print(f"⚠️ No relevant context for query: '{question}'")
+            return {
+                "messages": [
+                    AIMessage(content="I don't have enough information in the documents to answer this question.")
+                ]
+            }
+
+        # 🔧 Improved prompt emphasizing question focus
+        prompt_text = """You are a helpful assistant that answers questions based on provided context.
+
+IMPORTANT: Answer the specific question asked by the user. Do not just summarize the context.
+
+Context from documents:
+{context}
+
+Previous conversation:
+{chat_history}
+
+Current question: {question}
+
+Provide a direct answer to the question. If the context doesn't contain the answer, say so clearly."""
+
+        prompt = ChatPromptTemplate.from_template(prompt_text)
+        chain = prompt | self.llm | StrOutputParser()
+
+        response = chain.invoke({
+            "context": context,
+            "chat_history": chat_history,
+            "question": question
+        })
+
+        print(f"AI Response: {response[:100]}...")  # 🔧 Log response preview
+        return {"messages": [AIMessage(content=response)]}
 
     def _build_workflow(self):
-        # Create the graph
-
         workflow = StateGraph(self.BasicChatState)
-        workflow.add_node("Assistant", self._ai_assistant)
         workflow.add_node("Retriever", self._vector_retriever)
         workflow.add_node("Generator", self._generate)
-        workflow.add_node("Rewriter", self._rewrite)
-
-        workflow.add_edge(START, "Assistant")
-        workflow.add_conditional_edges(
-            "Assistant",
-            lambda state: "Retriever" if "TOOL" in state["messages"][-1].content else END,
-            {"Retriever": "Retriever", END: END},
-        )
-        workflow.add_conditional_edges(
-            "Retriever",
-            self._grade_documents,
-            {"generator": "Generator", "rewriter": "Rewriter"},
-        )
+        workflow.add_edge(START, "Retriever")
+        workflow.add_edge("Retriever", "Generator")
         workflow.add_edge("Generator", END)
-        workflow.add_edge("Rewriter", "Assistant")
         return workflow
 
-    # ---------- Public Run ----------
-    def run(self, query: str,thread_id: str = "default_thread", collection_name : str = "defaultdb") -> str:
-        """Run the workflow for a given query and return the final answer."""
-        print(f" my collection name is inside run  : {collection_name}")
-
-        config = {
-            "configurable": {
-                "thread_id": thread_id,
-                "collection_name": collection_name
-            }
-        }
-        result = self.app.invoke(
-            {"messages": [HumanMessage(content=query)]},
-            config=config
-        )
+    def run(self, query: str, thread_id: str = "default_thread", collection_name: str = "defaultdb") -> str:
+        """Run the workflow for a query."""
+        config = {"configurable": {"thread_id": thread_id, "collection_name": collection_name}}
+        result = self.app.invoke({"messages": [HumanMessage(content=query)]}, config=config)
         return result["messages"][-1].content
-    
-    def get_chat_messages_from_langgraph(self,chat_id: str) -> List[Any]:
-        """
-        Get chat messages from LangGraph checkpointer for a specific chat_id
-        
-        Args:
-            chat_id: The thread_id/chat_id to retrieve messages for
-            
-        Returns:
-            List of LangGraph message objects
-        """
-                # Get state from LangGraph checkpointer using the same pattern as your existing code
+
+    def get_chat_messages_from_langgraph(self, chat_id: str) -> List[Any]:
+        """Get chat messages from LangGraph checkpointer for a specific chat_id"""
         state = self.app.get_state(config={'configurable': {'thread_id': chat_id}})
-            
-            # Extract messages from state, return empty list if not found
         messages = state.values.get('messages', [])
-            
         return messages
-
-
-        # graph = StateGraph(self.BasicChatState)
-        # graph.add_node("Assistant", self._ai_assistant)
-        # graph.add_node("Retriever", self._vector_retriever)
-        # graph.add_node("Generator", self._generate)
-        # graph.add_node("Rewriter", self._rewrite)
-
-        # # Add the chatbot node
-        # graph.add_node("chatbot", chatbot)
-        # # Set up the flow
-        # graph.set_entry_point("chatbot")
-        # graph.add_edge("chatbot", END)
-        # return graph
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# from pydantic import BaseModel
-
-# # Pydantic models for the API response
-# class ChatMessage(BaseModel):  # Renamed to avoid conflict with LangGraph Message
-#     id: str
-#     role: str  # "user" or "assistant"
-#     content: str
-#     timestamp: datetime
-
-# class ChatMessagesResponse(BaseModel):
-#     chat_id: str
-#     messages: List[ChatMessage]
-#     total_messages: int
-
-    
-
-
-# def chatbot(state: BasicChatState, config: RunnableConfig = None): 
-#     # Get the last human message
-#     last_message = state["messages"][-1]
-    
-#     # Extract the content from the message to query RAG
-#     if hasattr(last_message, 'content'):
-#         query_text = last_message.content
-#     else:
-#         query_text = str(last_message)
-
-#     # Get collection_name from config
-#     collection_name = config.get("configurable", {}).get("collection_name", "default_collection")
-
-
-#     # Query the RAG system
-#     #rag_response = query_rag_langgraph(query_text)
-
-#     rag_response = query_rag_langgraph(query_text, collection_name=collection_name)
-    
-#     # Create an AI message from the RAG response
-#     ai_message = AIMessage(content=rag_response.response_text)
-    
-#     return {
-#        "messages": [ai_message]
-#     }
-
-# # Initialize memory
-# sqlite_conn = sqlite3.connect("database/checkpoint.db", check_same_thread=False)
-# checkpointer = SqliteSaver(sqlite_conn)
-
-# # Create the graph
-# graph = StateGraph(BasicChatState)
-
-# # Add the chatbot node
-# graph.add_node("chatbot", chatbot)
-
-# # Set up the flow
-# graph.set_entry_point("chatbot")
-# graph.add_edge("chatbot", END)
-
-# # Compile the graph
-# chabotapp = graph.compile(checkpointer=checkpointer)
-
-
-
-# def get_chat_messages_from_langgraphbak(chat_id: str) -> List[Any]:
-#     """
-#     Get chat messages from LangGraph checkpointer for a specific chat_id
-    
-#     Args:
-#         chat_id: The thread_id/chat_id to retrieve messages for
-        
-#     Returns:
-#         List of LangGraph message objects
-#     """
-#     # Get state from LangGraph checkpointer using the same pattern as your existing code
-#     state = chabotapp.get_state(config={'configurable': {'thread_id': chat_id}})
-        
-#     # Extract messages from state, return empty list if not found
-#     messages = state.values.get('messages', [])
-#     print("checkpoint message :" ,messages)        
-#     return messages
-
-# def get_chat_messages_from_langgraph(chat_id: str) -> List[Any]:
-#     """
-#     Get chat messages from LangGraph checkpointer for a specific chat_id
-    
-#     Args:
-#         chat_id: The thread_id/chat_id to retrieve messages for
-        
-#     Returns:
-#         List of LangGraph message objects
-#     """
-#             # Get state from LangGraph checkpointer using the same pattern as your existing code
-#     state = chabotapp.get_state(config={'configurable': {'thread_id': chat_id}})
-        
-#         # Extract messages from state, return empty list if not found
-#     messages = state.values.get('messages', [])
-        
-#     return messages
-
-
-
-
-# def convert_langgraph_messages_to_format(langgraph_messages: List[Any]) -> List[ChatMessage]:
-#     """
-#     Convert LangGraph checkpointer message format to ChatMessage format
-    
-#     Args:
-#         langgraph_messages: List of HumanMessage/AIMessage objects from LangGraph
-        
-#     Returns:
-#         List of ChatMessage objects in desired format
-#     """
-#     messages = []
-    
-#     for msg in langgraph_messages:
-#         try:
-#             # Determine the role based on message type
-#             message_type = msg.__class__.__name__
-            
-#             if message_type == 'HumanMessage':
-#                 role = "user"
-#             elif message_type == 'AIMessage':
-#                 role = "assistant"
-#             elif message_type == 'SystemMessage':
-#                 role = "system"
-#             else:
-#                 # Handle any other message types
-#                 role = "system"
-            
-#             # Extract content safely
-#             content = getattr(msg, 'content', '')
-#             if not isinstance(content, str):
-#                 content = str(content)
-            
-#             # Extract ID safely
-#             message_id = getattr(msg, 'id', '')
-#             if not isinstance(message_id, str):
-#                 message_id = str(message_id)
-            
-#             # Extract timestamp if available in additional_kwargs or use current time
-#             timestamp = datetime.now()
-            
-#             # Check if there's a timestamp in additional_kwargs or response_metadata
-#             if hasattr(msg, 'additional_kwargs') and msg.additional_kwargs:
-#                 if 'timestamp' in msg.additional_kwargs:
-#                     try:
-#                         timestamp = datetime.fromisoformat(str(msg.additional_kwargs['timestamp']))
-#                     except:
-#                         pass
-            
-#             if hasattr(msg, 'response_metadata') and msg.response_metadata:
-#                 if 'timestamp' in msg.response_metadata:
-#                     try:
-#                         timestamp = datetime.fromisoformat(str(msg.response_metadata['timestamp']))
-#                     except:
-#                         pass
-            
-#             # Create ChatMessage object using dict to avoid Pydantic conflicts
-#             message_dict = {
-#                 "id": message_id,
-#                 "role": role,
-#                 "content": content,
-#                 "timestamp": timestamp
-#             }
-            
-#             # Create Pydantic model from dict
-#             message = ChatMessage(**message_dict)
-#             messages.append(message)
-            
-#         except Exception as e:
-#             print(f"Error processing message {msg}: {e}")
-#             continue
-    
-#     return messages
-
-
-
-# def convert_langgraph_messages_to_formatbak(langgraph_messages: List[Any]) -> List[ChatMessage]:
-#     """
-#     Convert LangGraph checkpointer message format to Message format
-    
-#     Args:
-#         langgraph_messages: List of HumanMessage/AIMessage objects from LangGraph
-        
-#     Returns:
-#         List of Message objects in desired format
-#     """
-#     messages = []
-    
-#     for msg in langgraph_messages:
-#         # Determine the role based on message type
-#         message_type = msg.__class__.__name__
-        
-#         if message_type == 'HumanMessage':
-#             role = "user"
-#         elif message_type == 'AIMessage':
-#             role = "assistant"
-#         elif message_type == 'SystemMessage':
-#             role = "system"
-#         else:
-#             # Handle any other message types
-#             role = "system"
-        
-#         # Extract timestamp if available in additional_kwargs or use current time
-#         timestamp = datetime.now()
-        
-#         # Check if there's a timestamp in additional_kwargs or response_metadata
-#         if hasattr(msg, 'additional_kwargs') and msg.additional_kwargs:
-#             if 'timestamp' in msg.additional_kwargs:
-#                 try:
-#                     timestamp = datetime.fromisoformat(str(msg.additional_kwargs['timestamp']))
-#                 except:
-#                     pass
-        
-#         if hasattr(msg, 'response_metadata') and msg.response_metadata:
-#             if 'timestamp' in msg.response_metadata:
-#                 try:
-#                     timestamp = datetime.fromisoformat(str(msg.response_metadata['timestamp']))
-#                 except:
-#                     pass
-        
-#         # Create Message object
-#         message = Message(
-#             id=str(msg.id),
-#             role=role,
-#             content=msg.content,
-#             timestamp=timestamp
-#         )
-        
-#         messages.append(message)
-    
-#     return messages
