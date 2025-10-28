@@ -14,3 +14,4 @@ data/
 database/
 *copy.py
 database/*.db
+experiment/
