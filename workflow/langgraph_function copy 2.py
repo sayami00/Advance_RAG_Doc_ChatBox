@@ -8,7 +8,6 @@ from langchain_core.output_parsers import StrOutputParser
 from langgraph.checkpoint.sqlite import SqliteSaver
 from typing import List, Optional, Dict, Any
 from datetime import datetime
-from langchain.schema.runnable import RunnableConfig
 import sqlite3
 from utils.model_loader import ModelLoader
 from retriever.retrieval import Retriever
