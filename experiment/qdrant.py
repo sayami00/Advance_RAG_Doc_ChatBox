@@ -6,7 +6,7 @@ from langchain_core.documents import Document
 embedding = OllamaEmbeddings(model="nomic-embed-text")
 
 # local persistent store
-client = QdrantClient(path="data/qdrant_db")
+#client = QdrantClient(path="data/qdrant_db")
 
 docs = [
     Document(page_content="Ncell follows a hybrid work model...", metadata={"source": "Ncell_Policy.txt"}),

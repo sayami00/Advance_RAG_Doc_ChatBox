@@ -11,6 +11,7 @@ from retriever.retrieval import Retriever
 from prompt_lib.prompts import PROMPT_REGISTRY, PromptType
 from utils.guardrails_manager import GuardrailsManager, GuardrailsResult  # Import guardrails
 import sqlite3
+from logger import GLOBAL_LOGGER as log
 
 
 class AgenticRAG:
@@ -26,16 +27,18 @@ class AgenticRAG:
         is_greeting: bool  # Flag for greetings
         skip_retrieval: bool  # Skip retrieval if greeting/blocked
 
-    def __init__(self, use_guardrails: bool = True, strict_mode: bool = False):
+    def __init__(self, use_guardrails: bool = True, strict_mode: bool = False,use_qdrant: bool = False):
         """
         Initialize AgenticRAG with optional guardrails
         
         Args:
             use_guardrails: Enable/disable guardrails (default: True)
             strict_mode: Use strict filtering (default: False)
+            use_qdrant: Use Qdrant instead of Chroma (default: False)
+
         """
         # Core components
-        self.retriever_obj = Retriever(use_qdrant=False)
+        self.retriever_obj = Retriever(use_qdrant=use_qdrant)
         self.model_loader = ModelLoader()
         self.llm = self.model_loader.load_llm()
 
@@ -43,10 +46,10 @@ class AgenticRAG:
         self.use_guardrails = use_guardrails
         if use_guardrails:
             self.guardrails = GuardrailsManager(strict_mode=strict_mode)
-            print("✅ Guardrails enabled")
+            log.info("Guardrails enabled", strict_mode=strict_mode)
         else:
             self.guardrails = None
-            print("⚠️ Guardrails disabled")
+            log.info("Guardrails disabled")
 
         # SQLite checkpoint
         self.sqlite_conn = sqlite3.connect("database/checkpoint.db", check_same_thread=False)
@@ -55,8 +58,7 @@ class AgenticRAG:
         # Build workflow
         self.workflow = self._build_workflow()
         self.app = self.workflow.compile(checkpointer=self.checkpointer)
-        
-        print(f"✅ AgenticRAG initialized")
+        log.info("AgenticRAG enabled")
 
     # ============================================================
     # GUARDRAILS NODES
@@ -71,7 +73,7 @@ class AgenticRAG:
         
         # Skip if guardrails disabled
         if not self.use_guardrails or not self.guardrails:
-            print("⚠️ Guardrails disabled, skipping validation")
+            log.info("Guardrails disabled, skipping validation")
             return {
                 "is_safe": True,
                 "is_greeting": False,
@@ -86,7 +88,7 @@ class AgenticRAG:
         
         # Handle result
         if result.is_greeting:
-            print("✅ Greeting detected - skipping retrieval")
+            log.info("Greeting detected - skipping retrieval")
             return {
                 "is_safe": True,
                 "is_greeting": True,
@@ -95,7 +97,7 @@ class AgenticRAG:
             }
         
         if not result.is_safe:
-            print(f"🚫 Input blocked: {result.blocked_reason}")
+            log.info(f"Input blocked: {result.blocked_reason}")
             return {
                 "is_safe": False,
                 "is_greeting": False,
@@ -104,7 +106,7 @@ class AgenticRAG:
             }
         
         # Input is safe, proceed to retrieval
-        print("✅ Input validation passed")
+        log.info("Input validation passed")
         return {
             "is_safe": True,
             "is_greeting": False,
@@ -116,11 +118,11 @@ class AgenticRAG:
         Output validation node - runs after generation
         Checks for: sensitive data, hallucinations, unsafe content
         """
-        print("--- OUTPUT GUARDRAILS ---")
+        log.info("--- OUTPUT GUARDRAILS ---")
         
         # Skip if guardrails disabled
         if not self.use_guardrails or not self.guardrails:
-            print("⚠️ Guardrails disabled, skipping output validation")
+            log.info("Guardrails disabled, skipping output validation")
             return {}
         
         # Get last AI message (generated response)
@@ -134,13 +136,13 @@ class AgenticRAG:
         result: GuardrailsResult = self.guardrails.check_output(bot_response)
         
         if not result.is_safe:
-            print(f"🚫 Output blocked: {result.blocked_reason}")
+            log.info(f"Output blocked: {result.blocked_reason}")
             # Replace unsafe output with safe message
             return {
                 "messages": [AIMessage(content=result.response_message)]
             }
         
-        print("✅ Output validation passed")
+        log.info("Output validation passed")
         return {}
 
     # ============================================================
@@ -189,10 +191,10 @@ Standalone question (be concise):"""
             elif rewritten.startswith("'") and rewritten.endswith("'"):
                 rewritten = rewritten[1:-1]
             
-            print(f"🔄 Query rewritten: '{question}' → '{rewritten}'")
+            log.info(f"Query rewritten: '{question}' → '{rewritten}'")
             return rewritten
         except Exception as e:
-            print(f"⚠️ Query rewrite failed: {e}, using original query")
+            log.info(f"Query rewrite failed: {e}, using original query")
             return question
 
     def _extract_score(self, doc) -> float:
@@ -211,16 +213,17 @@ Standalone question (be concise):"""
         return None
 
     def _vector_retriever(self, state: BasicChatState, config: RunnableConfig = None):
-        """Retrieval node - fetch relevant documents"""
-        print("--- RETRIEVER ---")
+        """Retrieval node - fetch relevant documents with context validation"""
+        log.info("--- RETRIEVER ---")
         
         # Skip retrieval if flagged (greeting or blocked input)
         if state.get("skip_retrieval", False):
-            print("⏭️ Skipping retrieval (greeting or blocked input)")
-            return {"context": ""}
+            log.info("Skipping retrieval (greeting or blocked input)")
+            return {"context": "", "retrieved_docs": []}
         
         # Get query
         query = state["messages"][-1].content
+        original_query = query  # Store original for relevance check
         
         # Optional: Rewrite query for follow-ups
         chat_messages = [msg for msg in state["messages"][:-1] 
@@ -230,13 +233,14 @@ Standalone question (be concise):"""
             query = self._rewrite_query(query, recent_history)
         
         collection_name = config.get("configurable", {}).get("collection_name", "defaultdb")
+        print(f"Using collection: {collection_name} for query: {query}")
 
-        # Define which collections should use Qdrant
         qdrant_collections = ["GlobalITServicesDB", "GlobalHRServicesDB"]
 
         if collection_name in qdrant_collections:
             # Load retriever
-            retriever = self.retriever_obj.load_retriever_qdrant(
+            retriever_obj = Retriever(use_qdrant=True)
+            retriever = retriever_obj.load_retriever_qdrant(
                 collection_name=collection_name,
                 top_k=5,
                 score_threshold=0.3  #Lowered to 0.3 for testing - adjust as needed
@@ -245,28 +249,76 @@ Standalone question (be concise):"""
 
         else:
             # Load retriever
-            retriever = self.retriever_obj.load_retriever_chroma(
+            retriever_obj = Retriever(use_qdrant=False)
+            retriever = retriever_obj.load_retriever_chroma(
                 collection_name=collection_name,
                 top_k=5,
             )
             print(f"Using Chroma collection: {collection_name} for query: {query}")
-
-
         
         # Retrieve documents
         docs = retriever.invoke(query)
-        # Calculate average similarity if scores exist
-        avg_score = 0
-        valid_scores = [d.metadata.get("score", None) for d in docs if d.metadata.get("score")]
-        if valid_scores:
-            avg_score = sum(valid_scores) / len(valid_scores)
-            print(f"🔹 Average similarity score: {avg_score:.4f}")
 
+        # 🔧 CRITICAL: Check if no documents retrieved
+        if not docs or len(docs) == 0:
+            log.info(f"No documents found for query: '{original_query}'")
+            if self.use_guardrails and self.guardrails:
+                # Use guardrails to generate appropriate message
+                relevance_check = self.guardrails.check_context_relevance(
+                    query=original_query,
+                    retrieved_docs=[],
+                    min_docs=1
+                )
+                return {
+                    "context": "",
+                    "retrieved_docs": [],
+                    "skip_retrieval": True,
+                    "messages": [AIMessage(content=relevance_check.response_message)]
+                }
+            else:
+                # Fallback without guardrails
+                return {
+                    "context": "",
+                    "retrieved_docs": [],
+                    "skip_retrieval": True,
+                    "messages": [AIMessage(content="I don't have any relevant information in the documents to answer this question.")]
+                }
 
-        if not docs:
-            print(f"⚠️ No relevant documents found for query: '{query}'")
-            return {"context": ""}
+        # 🔧 CRITICAL: Validate context relevance BEFORE generating answer
+        if self.use_guardrails and self.guardrails:
+            log.info("Checking context relevance...")
+            relevance_check = self.guardrails.check_context_relevance(
+                query=original_query,  # Use original query, not rewritten
+                retrieved_docs=docs,
+                min_docs=1,
+                min_score=0.3,
+                require_query_overlap=True  # ✅ Set to False to disable overlap check temporarily
+            )
+            
+            if not relevance_check.is_safe:
+                log.info(f"Context relevance check FAILED: {relevance_check.blocked_reason}")
+                log.info(f"   Reason: Retrieved docs don't match query well enough")
+                
+                # 🔧 DEBUG: Print what was checked
+                if relevance_check.metadata:
+                    log.info(f"   Overlap: {relevance_check.metadata.get('overlap_score', 0):.2%}")
+                    log.info(f"   Query terms: {relevance_check.metadata.get('query_terms', [])[:5]}")
+                    log.info(f"   Matched: {relevance_check.metadata.get('matched_terms', [])}")
+                
+                # Block generation, return safe message
+                return {
+                    "context": "",
+                    "retrieved_docs": [],
+                    "skip_retrieval": True,
+                    "messages": [AIMessage(content=relevance_check.response_message)]
+                }
+            else:
+                log.info(f"Context relevance check PASSED")
+                if relevance_check.metadata:
+                    log.info(f"   Overlap score: {relevance_check.metadata.get('overlap_score', 'N/A')}")
+                    log.info(f"   Matched terms: {relevance_check.metadata.get('matched_count', 0)}/{relevance_check.metadata.get('total_terms', 0)}")
 
+        # Format context only if relevance check passed
         context = self._format_docs(docs)
 
         print(f"Retrieved {len(docs)} relevant document(s)")
@@ -283,15 +335,15 @@ Standalone question (be concise):"""
                 if meta_clean:
                     print(f"Metadata: {meta_clean}")
 
-        return {"context": context}
+        return {"context": context, "retrieved_docs": docs}
 
     def _generate(self, state: BasicChatState):
         """Generation node - create response from context"""
-        print("--- GENERATE ---")
+        log.info("--- GENERATE ---")
 
         # Skip generation if already handled by guardrails
         if state.get("skip_retrieval", False):
-            print("⏭️ Skipping generation (already handled)")
+            log.info("Skipping generation (already handled)")
             return {}
         
         # Get context and history
@@ -323,7 +375,7 @@ Standalone question (be concise):"""
 
         # Handle no context
         if not context:
-            print(f"⚠️ No relevant context for query: '{question}'")
+            log.info(f"No relevant context for query: '{question}'")
             return {
                 "messages": [
                     AIMessage(content="I don't have enough information in the documents to answer this question.")
@@ -368,10 +420,10 @@ Provide a direct answer to the question. If the context doesn't contain the answ
         - Otherwise: go to Retriever
         """
         if state.get("skip_retrieval", False):
-            print("🔀 Routing to END (skipping retrieval)")
+            log.info("Routing to END (skipping retrieval)")
             return END
         
-        print("🔀 Routing to Retriever")
+        log.info("Routing to Retriever")
         return "Retriever"
 
     # ============================================================
@@ -479,7 +531,7 @@ Provide a direct answer to the question. If the context doesn't contain the answ
         self.workflow = self._build_workflow()
         self.app = self.workflow.compile(checkpointer=self.checkpointer)
         
-        print(f"✅ Guardrails {'enabled' if enabled else 'disabled'} (was: {'enabled' if old_state else 'disabled'})")
+        log.info(f"Guardrails {'enabled' if enabled else 'disabled'} (was: {'enabled' if old_state else 'disabled'})")
     
     def get_guardrails_stats(self) -> dict:
         """

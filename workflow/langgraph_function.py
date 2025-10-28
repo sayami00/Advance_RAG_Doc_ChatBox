@@ -120,14 +120,26 @@ Standalone question (be concise):"""
         print(f"Using collection: {collection_name} for query: {query}")
 
 
-        # 🔧 Load retriever with proper score threshold (0.5 = moderate relevance)
-        retriever = self.retriever_obj.load_retriever_chroma(
-        #retriever = self.retriever_obj.load_retriever_qdrant(
-            collection_name=collection_name,
-            top_k=5,
-            #score_threshold=0.3  # 🔧 Lowered to 0.3 for testing - adjust as needed
-        )
-        
+        qdrant_collections = ["GlobalITServicesDB", "GlobalHRServicesDB"]
+
+        if collection_name in qdrant_collections:
+            # Load retriever
+            retriever = self.retriever_obj.load_retriever_qdrant(
+                collection_name=collection_name,
+                top_k=5,
+                score_threshold=0.3  #Lowered to 0.3 for testing - adjust as needed
+            )
+            print(f"Using Qdrant collection: {collection_name} for query: {query}")
+
+        else:
+            # Load retriever
+            retriever = self.retriever_obj.load_retriever_chroma(
+                collection_name=collection_name,
+                top_k=5,
+            )
+            print(f"Using Chroma collection: {collection_name} for query: {query}")
+
+
         # 🔧 Retriever now automatically filters by score_threshold
         docs = retriever.invoke(query)
 

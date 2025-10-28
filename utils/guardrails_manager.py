@@ -1,10 +1,23 @@
+"""
+guardrails_manager.py - Optimal Implementation
+Combines regex-based validation with optional LLM-enhanced checks
+Place in: utils/guardrails_manager.py
+
+Benefits:
+- Fast regex-based primary checks (no LLM calls)
+- Optional LLM-enhanced validation for edge cases
+- Easy to customize and extend
+- Lightweight with minimal dependencies
+"""
+
 import re
 import logging
 from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
-from logger import GLOBAL_LOGGER as log
 
+# Setup logging
+from logger import GLOBAL_LOGGER as logger
 
 class BlockReason(Enum):
     """Enumeration of blocking reasons for better tracking"""
@@ -15,6 +28,8 @@ class BlockReason(Enum):
     INPUT_TOO_LONG = "input_too_long"
     INPUT_TOO_SHORT = "input_too_short"
     HALLUCINATION = "potential_hallucination"
+    NO_RELEVANT_CONTEXT = "no_relevant_context"
+    LOW_CONTEXT_RELEVANCE = "low_context_relevance"
 
 
 @dataclass
@@ -48,7 +63,7 @@ class GuardrailsManager:
         self, 
         strict_mode: bool = False,
         enable_logging: bool = True,
-        custom_config: Optional[Dict[str, Any]] = None,
+        custom_config: Optional[Dict[str, Any]] = None
     ):
         """
         Initialize Guardrails Manager
@@ -61,8 +76,7 @@ class GuardrailsManager:
         self.strict_mode = strict_mode
         self.enable_logging = enable_logging
         self.custom_config = custom_config or {}
-        self.bot_role :str = "DocChatBot"
-
+        
         # Statistics tracking
         self.stats = {
             "total_checks": 0,
@@ -70,13 +84,15 @@ class GuardrailsManager:
             "blocked_outputs": 0,
             "greetings_detected": 0,
             "jailbreaks_blocked": 0,
+            "no_context_blocks": 0,
+            "low_relevance_blocks": 0,
         }
         
         # Setup patterns
         self._setup_patterns()
         
         if enable_logging:
-            log.info(f"✅ GuardrailsManager initialized (Strict Mode: {strict_mode})")
+            logger.info(f"✅ GuardrailsManager initialized (Strict Mode: {strict_mode})")
     
     def _setup_patterns(self):
         """Setup all detection patterns"""
@@ -93,10 +109,10 @@ class GuardrailsManager:
         ])
         
         self.greeting_responses = self.custom_config.get("greeting_responses", [
-            f"Hello! I'm your {self.bot_role} documentation assistant. How can I help you today?",
-            f"Hi there! I'm here to help with {self.bot_role} documentation. What would you like to know?",
-            f"Greetings! Ask me anything about {self.bot_role} documentation, team members, or projects.",
-            f"Hello! Ready to assist with your {self.bot_role} documentation queries.",
+            "Hello! I'm your IT-BSS documentation assistant. How can I help you today?",
+            "Hi there! I'm here to help with IT-BSS documentation. What would you like to know?",
+            "Greetings! Ask me anything about IT-BSS documentation, team members, or projects.",
+            "Hello! Ready to assist with your IT-BSS documentation queries.",
         ])
         
         # ============================================================
@@ -110,8 +126,8 @@ class GuardrailsManager:
         ])
         
         self.farewell_responses = self.custom_config.get("farewell_responses", [
-            f"Goodbye! Feel free to return if you have more questions about {self.bot_role} documentation.",
-            f"See you later! I'm always here to help with {self.bot_role} queries.",
+            "Goodbye! Feel free to return if you have more questions about IT-BSS documentation.",
+            "See you later! I'm always here to help with IT-BSS queries.",
             "Take care! Come back anytime you need help with documentation.",
         ])
         
@@ -266,7 +282,7 @@ class GuardrailsManager:
         if self._is_greeting(query_lower):
             self.stats["greetings_detected"] += 1
             if self.enable_logging:
-                log.info(f"✅ Greeting detected: '{user_input[:50]}'")
+                logger.info(f"Greeting detected: '{user_input[:50]}'")
             return GuardrailsResult(
                 is_safe=True,
                 is_greeting=True,
@@ -277,7 +293,7 @@ class GuardrailsManager:
         # 2. FAREWELL CHECK
         if self._is_farewell(query_lower):
             if self.enable_logging:
-                log.info(f"✅ Farewell detected: '{user_input[:50]}'")
+                logger.info(f"Farewell detected: '{user_input[:50]}'")
             return GuardrailsResult(
                 is_safe=True,
                 is_farewell=True,
@@ -292,11 +308,11 @@ class GuardrailsManager:
             self.stats["jailbreaks_blocked"] += 1
             matched_patterns.append(jailbreak_pattern)
             if self.enable_logging:
-                log.warning(f"🚫 Jailbreak blocked: '{user_input[:50]}'")
+                logger.warning(f"Jailbreak blocked: '{user_input[:50]}'")
             return GuardrailsResult(
                 is_safe=False,
                 blocked_reason=BlockReason.JAILBREAK.value,
-                response_message=f"I cannot comply with that request. I'm designed to assist with {self.bot_role} documentation queries only.",
+                response_message="I cannot comply with that request. I'm designed to assist with IT-BSS documentation queries only.",
                 matched_patterns=matched_patterns,
                 metadata={"severity": "high"}
             )
@@ -306,11 +322,11 @@ class GuardrailsManager:
         if blocked_topic:
             self.stats["blocked_inputs"] += 1
             if self.enable_logging:
-                log.warning(f"🚫 Blocked topic '{blocked_topic}': '{user_input[:50]}'")
+                logger.warning(f"Blocked topic '{blocked_topic}': '{user_input[:50]}'")
             return GuardrailsResult(
                 is_safe=False,
                 blocked_reason=f"{BlockReason.BLOCKED_TOPIC.value}_{blocked_topic}",
-                response_message=f"I'm sorry, but I'm specifically designed to help with {self.bot_role} documentation queries. I cannot assist with {blocked_topic.replace('_', ' ')} topics. Please ask me about documentation, team members, or projects.",
+                response_message=f"I'm sorry, but I'm specifically designed to help with IT-BSS documentation queries. I cannot assist with {blocked_topic.replace('_', ' ')} topics. Please ask me about documentation, team members, or projects.",
                 matched_patterns=[blocked_topic],
                 metadata={"topic": blocked_topic}
             )
@@ -321,7 +337,7 @@ class GuardrailsManager:
             self.stats["blocked_inputs"] += 1
             matched_patterns.append(unsafe_pattern)
             if self.enable_logging:
-                log.warning(f"🚫 Unsafe input: '{user_input[:50]}'")
+                logger.warning(f"Unsafe input: '{user_input[:50]}'")
             return GuardrailsResult(
                 is_safe=False,
                 blocked_reason=BlockReason.UNSAFE_CONTENT.value,
@@ -334,7 +350,7 @@ class GuardrailsManager:
         if len(user_input) > 2000:
             self.stats["blocked_inputs"] += 1
             if self.enable_logging:
-                log.warning(f"🚫 Input too long: {len(user_input)} chars")
+                logger.warning(f"Input too long: {len(user_input)} chars")
             return GuardrailsResult(
                 is_safe=False,
                 blocked_reason=BlockReason.INPUT_TOO_LONG.value,
@@ -353,7 +369,7 @@ class GuardrailsManager:
         
         # ALL CHECKS PASSED
         if self.enable_logging:
-            log.info(f"✅ Input validation passed: '{user_input[:50]}'")
+            logger.info(f"Input validation passed: '{user_input[:50]}'")
         return GuardrailsResult(
             is_safe=True,
             metadata={"checks_passed": ["greeting", "jailbreak", "topics", "unsafe", "length"]}
@@ -378,7 +394,7 @@ class GuardrailsManager:
                 self.stats["blocked_outputs"] += 1
                 matched_patterns.append(data_type)
                 if self.enable_logging:
-                    log.warning(f"🚫 Sensitive data in output: {data_type}")
+                    logger.warning(f"Sensitive data in output: {data_type}")
                 return GuardrailsResult(
                     is_safe=False,
                     blocked_reason=BlockReason.SENSITIVE_DATA.value,
@@ -393,7 +409,7 @@ class GuardrailsManager:
                 if re.search(pattern, output_lower):
                     self.stats["blocked_outputs"] += 1
                     if self.enable_logging:
-                        log.warning(f"🚫 Potential hallucination detected in output")
+                        logger.warning(f"Potential hallucination detected in output")
                     return GuardrailsResult(
                         is_safe=False,
                         blocked_reason=BlockReason.HALLUCINATION.value,
@@ -413,6 +429,240 @@ class GuardrailsManager:
         
         # ALL CHECKS PASSED
         return GuardrailsResult(is_safe=True, metadata={"checks_passed": ["sensitive_data", "hallucination", "length"]})
+    
+    # ============================================================
+    # CONTEXT RELEVANCE VALIDATION (NEW)
+    # ============================================================
+    
+    def check_context_relevance(
+        self,
+        query: str,
+        retrieved_docs: List[Any],
+        min_docs: int = 1,
+        min_score: float = 0.3,
+        require_query_overlap: bool = True
+    ) -> GuardrailsResult:
+        """
+        Validate if retrieved context is relevant enough to answer the query
+        
+        Args:
+            query: User's query
+            retrieved_docs: List of retrieved documents (with optional scores)
+            min_docs: Minimum number of documents required
+            min_score: Minimum relevance score threshold
+            require_query_overlap: Check if key terms from query appear in context
+            
+        Returns:
+            GuardrailsResult indicating if context is sufficient
+        """
+        
+        # 1. CHECK: No documents retrieved
+        if not retrieved_docs or len(retrieved_docs) == 0:
+            self.stats["no_context_blocks"] += 1
+            if self.enable_logging:
+                logger.warning(f"No documents retrieved for query: '{query[:50]}'")
+            return GuardrailsResult(
+                is_safe=False,
+                blocked_reason=BlockReason.NO_RELEVANT_CONTEXT.value,
+                response_message="I don't have any relevant information in the documents to answer this question. Please try rephrasing or ask about a different topic.",
+                metadata={
+                    "retrieved_count": 0,
+                    "min_required": min_docs
+                }
+            )
+        
+        # 2. CHECK: Insufficient number of documents
+        if len(retrieved_docs) < min_docs:
+            self.stats["low_relevance_blocks"] += 1
+            if self.enable_logging:
+                logger.warning(f"Only {len(retrieved_docs)} docs retrieved (min: {min_docs})")
+            return GuardrailsResult(
+                is_safe=False,
+                blocked_reason=BlockReason.LOW_CONTEXT_RELEVANCE.value,
+                response_message="I found limited information about this in the documents. Please be more specific or ask about a different topic.",
+                metadata={
+                    "retrieved_count": len(retrieved_docs),
+                    "min_required": min_docs
+                }
+            )
+        
+        # 3. CHECK: Relevance scores (if available)
+        docs_with_low_scores = []
+        docs_with_scores = 0
+        
+        for doc in retrieved_docs:
+            # Try to extract score from document
+            score = self._extract_doc_score(doc)
+            
+            if score is not None:
+                docs_with_scores += 1
+                if score < min_score:
+                    docs_with_low_scores.append(score)
+        
+        # If scores are available and all are below threshold
+        if docs_with_scores > 0 and len(docs_with_low_scores) == docs_with_scores:
+            self.stats["low_relevance_blocks"] += 1
+            avg_score = sum(docs_with_low_scores) / len(docs_with_low_scores)
+            if self.enable_logging:
+                logger.warning(f"All docs below threshold. Avg score: {avg_score:.3f} (min: {min_score})")
+            return GuardrailsResult(
+                is_safe=False,
+                blocked_reason=BlockReason.LOW_CONTEXT_RELEVANCE.value,
+                response_message="The available information doesn't seem highly relevant to your question. Please rephrase or provide more context.",
+                metadata={
+                    "average_score": avg_score,
+                    "min_score": min_score,
+                    "retrieved_count": len(retrieved_docs)
+                }
+            )
+        
+        # 4. CHECK: Query-context overlap (semantic check)
+        if require_query_overlap:
+            overlap_result = self._check_query_context_overlap(query, retrieved_docs)
+            if not overlap_result["has_overlap"]:
+                self.stats["low_relevance_blocks"] += 1
+                if self.enable_logging:
+                    logger.warning(f"Low query-context overlap: {overlap_result['overlap_score']:.2f}")
+                return GuardrailsResult(
+                    is_safe=False,
+                    blocked_reason=BlockReason.LOW_CONTEXT_RELEVANCE.value,
+                    response_message="I couldn't find information that matches your query well enough. Could you rephrase or ask about something else?",
+                    metadata={
+                        "overlap_score": overlap_result["overlap_score"],
+                        "matched_terms": overlap_result["matched_terms"]
+                    }
+                )
+        
+        # ALL CHECKS PASSED - Context is relevant
+        if self.enable_logging:
+            logger.info(f"Context relevance check passed for query: '{query[:50]}'")
+        
+        return GuardrailsResult(
+            is_safe=True,
+            metadata={
+                "retrieved_count": len(retrieved_docs),
+                "docs_with_scores": docs_with_scores,
+                "checks_passed": ["doc_count", "scores", "overlap"]
+            }
+        )
+    
+    def _extract_doc_score(self, doc: Any) -> Optional[float]:
+        """
+        Extract relevance score from document object
+        Handles multiple formats: LangChain Document, dict, etc.
+        """
+        # Try direct attribute
+        if hasattr(doc, 'score') and doc.score is not None:
+            return float(doc.score)
+        
+        # Try metadata dict
+        if hasattr(doc, 'metadata') and isinstance(doc.metadata, dict):
+            if 'score' in doc.metadata:
+                return float(doc.metadata['score'])
+            if '_score' in doc.metadata:
+                return float(doc.metadata['_score'])
+            if 'relevance_score' in doc.metadata:
+                return float(doc.metadata['relevance_score'])
+        
+        # Try dict format
+        if isinstance(doc, dict):
+            if 'score' in doc:
+                return float(doc['score'])
+            if 'metadata' in doc and isinstance(doc['metadata'], dict):
+                if 'score' in doc['metadata']:
+                    return float(doc['metadata']['score'])
+        
+        return None
+    
+    def _check_query_context_overlap(
+        self, 
+        query: str, 
+        retrieved_docs: List[Any],
+        min_overlap_ratio: float = 0.2  # LOWERED from 0.4 to 0.2 (20% threshold)
+    ) -> Dict[str, Any]:
+        """
+        Check if key terms from query appear in retrieved context
+        Simple keyword-based overlap check
+        
+        Args:
+            query: User's query
+            retrieved_docs: Retrieved documents
+            min_overlap_ratio: Minimum ratio of query terms that should appear
+            
+        Returns:
+            Dict with overlap analysis
+        """
+        # Extract content from documents
+        all_content = ""
+        for doc in retrieved_docs:
+            if hasattr(doc, 'page_content'):
+                all_content += " " + doc.page_content.lower()
+            elif hasattr(doc, 'content'):
+                all_content += " " + doc.content.lower()
+            elif isinstance(doc, dict) and 'content' in doc:
+                all_content += " " + doc['content'].lower()
+        
+        # Extract meaningful terms from query (filter stop words)
+        stop_words = {
+            'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+            'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'should',
+            'could', 'may', 'might', 'can', 
+            'what', 'when', 'where', 'who', 'which', 'how', 'why',  # Keep 'why' only
+            'about', 'tell', 'me', 'you', 'your', 'my', 'i', 'we',
+            'they', 'them', 'their', 'this', 'that', 'these', 'those', 
+            'of', 'to', 'in', 'on', 'at', 'for', 'with', 'from', 'by',
+            'some', 'any', 'or', 'and', 'but', 'if', 'then',
+            # REMOVED common technical query words from stop list:
+            # 'summary', 'summarize', 'explain', 'describe', 'define'
+        }
+        
+        # Extract terms with better handling of technical terms
+        # Match whole words and hyphenated terms (e.g., "Feed-Forward")
+        query_terms_raw = re.findall(r'\b[\w-]+\b', query)
+        
+        query_terms = [
+            term.lower() for term in query_terms_raw
+            if term.lower() not in stop_words and len(term) > 2
+        ]
+        
+        # Also extract compound technical terms (e.g., "attention mechanism")
+        # Look for common technical bigrams
+        words = query.lower().split()
+        for i in range(len(words) - 1):
+            bigram = f"{words[i]} {words[i+1]}"
+            if words[i] not in stop_words and words[i+1] not in stop_words:
+                query_terms.append(bigram)
+        
+        if not query_terms:
+            # If no meaningful terms, consider it valid (e.g., very short query)
+            return {
+                "has_overlap": True,
+                "overlap_score": 1.0,
+                "matched_terms": [],
+                "query_terms": []
+            }
+        
+        # Check how many query terms appear in context
+        matched_terms = [term for term in query_terms if term in all_content]
+        overlap_ratio = len(matched_terms) / len(query_terms) if query_terms else 1.0
+        
+        # DEBUG: Log what's happening
+        if self.enable_logging and overlap_ratio < min_overlap_ratio:
+            logger.warning(
+                f"Low overlap: {overlap_ratio:.2%} "
+                f"(matched {len(matched_terms)}/{len(query_terms)} terms)\n"
+                f"  Query terms: {query_terms[:10]}\n"  # Show first 10
+                f"  Matched: {matched_terms}"
+            )
+        
+        return {
+            "has_overlap": overlap_ratio >= min_overlap_ratio,
+            "overlap_score": overlap_ratio,
+            "matched_terms": matched_terms,
+            "query_terms": query_terms,
+            "total_terms": len(query_terms),
+            "matched_count": len(matched_terms)
+        }
     
     # ============================================================
     # DETECTION HELPER METHODS
@@ -484,7 +734,7 @@ class GuardrailsManager:
             self.blocked_topics[subcategory].append(pattern)
         else:
             if self.enable_logging:
-                log.warning(f"Unknown category: {category}")
+                logger.warning(f"Unknown category: {category}")
     
     def remove_pattern(self, category: str, pattern: str, subcategory: Optional[str] = None):
         """Remove a pattern"""
@@ -499,7 +749,7 @@ class GuardrailsManager:
                 self.blocked_topics[subcategory].remove(pattern)
         except ValueError:
             if self.enable_logging:
-                log.warning(f"Pattern not found: {pattern}")
+                logger.warning(f"Pattern not found: {pattern}")
     
     def get_statistics(self) -> Dict[str, Any]:
         """Get comprehensive statistics"""

@@ -40,16 +40,17 @@ class ChatDBOperation:
             return f"{user_department}_Docs"  # fallback per department
         elif ragtype == "ITServicesGlobal":
             return "GlobalITServicesDB"
-        elif ragtype == "ITDesk":
+        elif ragtype == "IT-Desk":
             return "GlobalITServicesDB"
+        elif ragtype == "HR-Desk":
+            return "GlobalHRServicesDB"   
         elif ragtype == "HRDesk":
-            return "GlobalHRServicesDB"         
+            return "GlobalHRServicesDB"  
         elif ragtype == "GPTs":
             return "GPTCollection"
+        else:
+            return "GeneralCollection"
         
-        # Default fallback
-        return "GeneralCollection"
-
     def get_user_info(self, user_name: str) -> Optional[str]:
         """Return department for a user (or None if not found)."""
         with self.get_db_connection() as conn:

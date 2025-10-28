@@ -254,8 +254,9 @@ async def chat_query_langgraph(
     userdepartment=chat_ops.get_user_info(request.user_id)
 
     collection_name=chat_ops.get_collection(request.ragtype,userdepartment)
-    result = chatbot_app.run(query=request.query, thread_id=request.chat_id,  collection_name=collection_name )
+    log.info(f"{request.ragtype} --> {collection_name}")
 
+    result = chatbot_app.run(query=request.query, thread_id=request.chat_id,  collection_name=collection_name )
     #result = chabotapp.invoke({"messages": [HumanMessage(content=request.query)]},config=config)
 
     # Extract and print the AI response
@@ -283,22 +284,29 @@ async def upload_process(
 
     user_department = chat_ops.get_user_info(current_user)
     dh = DocHandler()
-    if user_department == "IT-GLobal":
-        collection_name = chat_ops.get_collection("IT-GLobal", user_department)
-        #dp= DocumentProcessor_Qdrant()
-        dp = DocumentProcessor()   
+    qdrant_department = ['HR-Desk','IT-GLobal']
+    if user_department in qdrant_department:
+        collection_name = chat_ops.get_collection(user_department, user_department)
+        print(f"{qdrant_department} --> {user_department}  --> {collection_name}")
+        dp= DocumentProcessor_Qdrant()
+        #dp = DocumentProcessor()   
+        selectedvectorestore="Qdrant"
 
     else:
         collection_name = chat_ops.get_collection("Mydepartment", user_department)
-        #dp = DocumentProcessor() 
-        dp= DocumentProcessor_Qdrant()
+        print(f"{qdrant_department} --> {user_department}  --> {collection_name}")
+
+        dp = DocumentProcessor() 
+        #dp= DocumentProcessor_Qdrant()
+        selectedvectorestore="chroma"
+
   
     department_temp_path = user_department.replace(" ", "")
-    log.info(f"User '{current_user}' from {user_department} trying to load doc in collection {collection_name}.")
+    log.info(f"User '{current_user}' from {user_department} trying to load doc in {selectedvectorestore} collection {collection_name}.")
     processed_files = []
 
     for file in files:
-        log.info(f"📥 Received file: {file.filename}")
+        log.info(f"Received file: {file.filename}")
         try:
             # Save file temporarily
             temp_saved_path = await dh.temp_save_file(FastAPIFileAdapter(file), department_temp_path)
@@ -306,16 +314,16 @@ async def upload_process(
             # Check for duplication
             existing_doc = dp.duplicate_validation(file.filename, collection_name)
             if existing_doc and len(existing_doc["ids"]) > 0:
-                log.info(f"⚠️ File '{file.filename}' already exists in ChromaDB. Skipping upload.")
+                log.info(f"File '{file.filename}' already exists in {selectedvectorestore}. Skipping upload.")
                 os.remove(temp_saved_path)
                 continue
 
             # Process document
-            log.info(f"🔍 No duplicate found. Processing file: {file.filename}")
+            log.info(f"No duplicate found. Processing file: {file.filename}")
             documents = dp.load_document(temp_saved_path)
             chunks = dp.split_documents(documents)
             dp.add_to_vectorestore(chunks, collection_name)
-            log.info(f"✅ File '{file.filename}' processed and added to ChromaDB.")
+            log.info(f"File '{file.filename}' processed and added to {selectedvectorestore}.")
 
             # Optional: move file to permanent storage (implement save_file if needed)
             saved_path = await dh.save_file(temp_saved_path, file.filename, department_temp_path)
@@ -323,7 +331,7 @@ async def upload_process(
                 processed_files.append(file.filename)
 
         except Exception as e:
-            log.exception(f"❌ Error processing file '{file.filename}': {str(e)}")
+            log.exception(f"Error processing file '{file.filename}': {str(e)}")
             raise HTTPException(status_code=500, detail=f"Failed to process '{file.filename}': {str(e)}")
 
     return {
